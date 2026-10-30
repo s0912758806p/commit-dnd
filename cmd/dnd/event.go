@@ -32,7 +32,7 @@ func newEventCmd() *cobra.Command {
 				e.Args[k] = v
 			}
 
-			s, err := openStore()
+			s, _, err := openStore()
 			if err != nil {
 				return err
 			}

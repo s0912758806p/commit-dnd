@@ -10,7 +10,7 @@ func newDebugCmd() *cobra.Command {
 		Short: "從 events.jsonl 重播並覆寫 state.json",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			s, err := openStore()
+			s, _, err := openStore()
 			if err != nil {
 				return err
 			}

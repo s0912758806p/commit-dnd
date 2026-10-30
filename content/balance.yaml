@@ -1,9 +1,53 @@
 # 遊戲數值。改完重新編譯（go:embed）即生效；改動會讓 state.json 的 content_hash 改變。
-# 所有數值都是整數：心情以千分位表示（0–1000）。
+# 所有數值都是整數：飽足與心情以千分位表示（0–1000）。
+# 設計基準：到 Lv 30 共約 18,795 XP，目標 1–2 個月 → 每天約 313–626 XP（見 docs/DESIGN-NOTES.md）。
+
+xp:
+  curve_base: 18        # 從 Lv N 升到 N+1 需要 round(curve_base × N^curve_exp) XP，
+  curve_exp: 1.3        # 載入時預先算成整數表，State 內不出現浮點
+  max_level: 99
+
+commit:
+  # 依 Conventional Commits 類型的基本 XP；不認得的類型算 other。
+  # 最低 10，確保第一筆 commit（含補給加倍）就能升到 Lv 2。
+  base:
+    feat: 30
+    fix: 25
+    test: 20
+    refactor: 20
+    perf: 20
+    docs: 10
+    style: 10
+    chore: 10
+    ci: 10
+    build: 10
+    revert: 10
+    other: 10
+  line_bonus_per_bit: 2  # 行數加成 = 2 × 行數的二進位位數（約 log2；1 行=1 位、100 行=7 位）……
+  line_bonus_max: 20     # ……最多 20，避免大量改動灌水
+  feed: 150              # 每筆 commit 增加的飽足
+  heal: 5                # 每筆 commit 回復的 HP
+
+supply:
+  commits_per_day: 3     # 每天（依 commit 的當地日期）前幾筆 commit……
+  multiplier: 2          # ……XP 乘上這個倍率
+
+hp:
+  base: 20               # Lv 1 的 HP 上限
+  per_level: 5           # 每升一級增加的 HP 上限
+  regen_every_minutes: 30
+  regen_amount: 1
+
+satiety:
+  start: 800
+  max: 1000
+  decay_every_minutes: 60
+  decay_amount: 10       # 每小時 -10：吃飽後約 4 天餓到 0
+  hungry_below: 200      # 低於這個值時 commit 的 XP 減半
 
 mood:
-  start: 500               # 第一個事件時的初始心情
+  start: 500
   max: 1000
-  per_pet: 50              # 每次 pet 增加
-  decay_every_minutes: 60  # 每經過這麼久……
-  decay_amount: 10         # ……心情減少這麼多（夾在 0）
+  per_pet: 50
+  decay_every_minutes: 60
+  decay_amount: 10

@@ -40,7 +40,7 @@ type CommitInfo struct {
 type Event struct {
 	V      int               `json:"v"`
 	Seq    int64             `json:"seq"` // store 指派，從 1 開始連續遞增；未落地的 tick 為 0
-	At     time.Time         `json:"at"`  // adapter 填入，store 落地前轉成 UTC
+	At     time.Time         `json:"at"`  // adapter 填入；保留時區（每日補給依當地日期），store 只去掉單調時鐘
 	Source Source            `json:"source"`
 	Type   string            `json:"type"`           // "commit" | "tool_use" | "turn" | "pet" | "warp" | "rebirth" ...
 	Repo   string            `json:"repo,omitempty"` // 只存資料夾名稱
