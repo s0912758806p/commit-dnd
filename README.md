@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/hero.svg" alt="Dungeons & Diffs：在終端機 commit，像素史萊姆獲得經驗升到 Lv 2，旁邊是往下延伸的地下城" width="100%">
+  <img src="docs/hero.svg" alt="Dungeons & Diffs：在終端機 commit，像素人族騎士獲得經驗升到 Lv 2，旁邊是往下延伸的地下城" width="100%">
 </p>
 
 # Dungeons & Diffs
