@@ -1,0 +1,9 @@
+# 遊戲數值。改完重新編譯（go:embed）即生效；改動會讓 state.json 的 content_hash 改變。
+# 所有數值都是整數：心情以千分位表示（0–1000）。
+
+mood:
+  start: 500               # 第一個事件時的初始心情
+  max: 1000
+  per_pet: 50              # 每次 pet 增加
+  decay_every_minutes: 60  # 每經過這麼久……
+  decay_amount: 10         # ……心情減少這麼多（夾在 0）
