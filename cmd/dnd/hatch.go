@@ -59,8 +59,6 @@ func newHatchCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			sp, _ := pack.SpeciesByID(species)
-			printf(cmd, "\n%s\n", sp.Art)
 			for _, l := range r.Logs {
 				printf(cmd, "%s\n", l.Text)
 			}

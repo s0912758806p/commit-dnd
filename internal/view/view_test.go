@@ -41,14 +41,18 @@ func TestStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	pet := engine.Pet{
-		Species: "slime", Name: "小橘", Level: 2, XP: 42, HP: 20, Satiety: 950, Mood: 500,
+		Species: "human", Name: "小橘", Stage: 1, Level: 2, XP: 42, HP: 20, Satiety: 950, Mood: 500,
 		SupplyDay: "2026-10-30", SupplyUsed: 1,
 	}
 	cases := map[string]engine.Pet{
 		"status.txt":        pet,
-		"status_hungry.txt": func() engine.Pet { p := pet; p.Species, p.Satiety, p.SupplyUsed = "owl", 120, 3; return p }(),
-		"status_newday.txt": func() engine.Pet { p := pet; p.Species, p.SupplyDay, p.SupplyUsed = "drake", "2026-10-29", 3; return p }(),
-		"status_knight.txt": func() engine.Pet { p := pet; p.Species, p.Name = "knight", "GR騎士"; return p }(),
+		"status_hungry.txt": func() engine.Pet { p := pet; p.Species, p.Satiety, p.SupplyUsed = "undead", 120, 3; return p }(),
+		"status_newday.txt": func() engine.Pet {
+			p := pet
+			p.Species, p.SupplyDay, p.SupplyUsed = "dragonkin", "2026-10-29", 3
+			return p
+		}(),
+		"status_alias.txt": func() engine.Pet { p := pet; p.Species, p.Name = "knight", "GR騎士"; return p }(), // 舊 id 也要顯示為人族
 		"status_maxlevel.txt": func() engine.Pet {
 			p := pet
 			p.Level, p.HP = c.Balance.XP.MaxLevel, c.MaxHP(c.Balance.XP.MaxLevel)
@@ -65,7 +69,7 @@ func TestStatus(t *testing.T) {
 
 func TestLog(t *testing.T) {
 	lines := []engine.LogLine{
-		{At: now.Add(-2 * time.Hour), Text: "蛋裂開了，史萊姆「小橘」誕生了！"},
+		{At: now.Add(-2 * time.Hour), Text: "蛋裂開了，人族「小橘」誕生了！"},
 		{At: now.Add(-time.Hour).UTC(), Text: "小橘 開拓了一條新通道，獲得 60 XP。"},
 	}
 	golden(t, "log.txt", Log(lines))

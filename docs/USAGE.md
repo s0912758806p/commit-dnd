@@ -17,7 +17,7 @@ make install   # 等同 go install ./cmd/dnd，安裝到 $(go env GOPATH)/bin �
 ## 開始玩
 
 ```bash
-dnd hatch            # 選物種（史萊姆、幼龍、貓頭鷹、人類騎士）並取名；也可以用 --species slime --name 小橘
+dnd hatch            # 選種族並取名；也可以用 --species human --name 小橘
 cd 你的-repo
 dnd install git      # 在這個 repo 的 post-commit 加入 dnd
 git commit -m "feat: ..."
@@ -25,6 +25,7 @@ dnd status           # 看看寵物
 dnd log              # 冒險日誌
 ```
 
+- **種族**：人族、精靈族、獸人族、鼠人族、矮人族、不死族、惡魔族、龍人族（`content/species.yaml`）。
 - **經驗**：依 Conventional Commits 類型給分（`feat` 30、`fix` 25、`test`／`refactor`／`perf` 20，其餘 10），加上改動行數的加成（上限 20）。
 - **每日補給**：每天前 3 筆 commit 經驗加倍。
 - **飽足**：每小時下降，commit 會餵食；太餓時 commit 的經驗減半。
@@ -71,7 +72,7 @@ GitHub Actions（`.github/workflows/ci.yml`）在每個 PR 與 push 到 `main` �
 
 ```
 cmd/dnd/                 CLI（Cobra），只負責組裝
-content/                 嵌入的 YAML：balance（數值）、species（物種與 ASCII 圖）、logs（日誌模板）
+content/                 嵌入的 YAML：balance（數值）、species（物種）、logs（日誌模板）
 internal/adapter/git/    post-commit 時的 git 輸出 → commit 事件（testdata/ 是真實樣本）
 internal/engine/         Apply 與 State
 internal/event/          Event 型別

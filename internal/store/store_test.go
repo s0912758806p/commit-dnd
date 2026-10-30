@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/s0912758806p/commit-dnd/content"
+	"github.com/s0912758806p/commit-dnd/internal/engine"
 	"github.com/s0912758806p/commit-dnd/internal/event"
 )
 
@@ -33,7 +35,7 @@ func open(t *testing.T, dir string) *FileStore {
 func openHatched(t *testing.T, dir string) *FileStore {
 	t.Helper()
 	s := open(t, dir)
-	e := event.Event{At: t0, Source: event.SourceUser, Type: "hatch", Args: map[string]string{"species": "slime", "name": "小橘"}}
+	e := event.Event{At: t0, Source: event.SourceUser, Type: "hatch", Args: map[string]string{"species": "human", "name": "小橘"}}
 	if _, err := s.Update(e); err != nil {
 		t.Fatal(err)
 	}
@@ -239,13 +241,13 @@ func TestOutdatedStateIsRebuilt(t *testing.T) {
 		t.Fatal(err)
 	}
 	statePath := filepath.Join(dir, stateFile)
-	old := bytes.Replace(readFile(t, statePath), []byte(`"v": 2,`), []byte(`"v": 1,`), 1)
+	old := bytes.Replace(readFile(t, statePath), []byte(fmt.Sprintf(`"v": %d,`, engine.StateVersion)), []byte(`"v": 1,`), 1)
 	old = bytes.Replace(old, []byte(`"pets": 1,`), []byte(`"pets": 99,`), 1)
 	if err := os.WriteFile(statePath, old, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	st, err := s.Load()
-	if err != nil || st.Pet.Pets != 1 || st.V != 2 {
+	if err != nil || st.Pet.Pets != 1 || st.V != engine.StateVersion {
 		t.Fatalf("Load 沒有重播: pets=%d v=%d err=%v", st.Pet.Pets, st.V, err)
 	}
 	if !bytes.Equal(readFile(t, statePath), old) {

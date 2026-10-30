@@ -12,29 +12,35 @@ import (
 	"github.com/s0912758806p/commit-dnd/internal/engine"
 )
 
-const barWidth = 10
-
-// Status 是 `dnd status` 的輸出。now 只用來判斷今天的補給還剩幾次。
+// Status 是 `dnd status` 的輸出：一行一個「標籤  數值」，只有文字、不畫圖。
+// now 只用來判斷今天的補給還剩幾次。
 func Status(s engine.State, c *content.Pack, now time.Time) string {
 	p := s.Pet
 	if !p.Hatched() {
 		return "還沒有寵物。用 dnd hatch 孵一隻吧。\n"
 	}
 	var b strings.Builder
-	sp, _ := c.SpeciesByID(p.Species)
-	b.WriteString(sp.Art)
-	b.WriteString("\n")
-	fmt.Fprintf(&b, "%s（%s）Lv %d\n", p.Name, sp.Name, p.Level)
-
-	if cost := c.Cost(p.Level); cost > 0 {
-		fmt.Fprintf(&b, "XP   %s  %d/%d\n", bar(p.XP, cost), p.XP, cost)
-	} else {
-		fmt.Fprintf(&b, "XP   %s  已達最高等級\n", bar(1, 1))
+	row := func(label, format string, a ...any) {
+		fmt.Fprintf(&b, "%s  %s\n", label, fmt.Sprintf(format, a...))
 	}
-	maxHP := c.MaxHP(p.Level)
-	fmt.Fprintf(&b, "HP   %s  %d/%d\n", bar(p.HP, maxHP), p.HP, maxHP)
-	fmt.Fprintf(&b, "飽足 %s  %d/%d\n", bar(p.Satiety, c.Balance.Satiety.Max), p.Satiety, c.Balance.Satiety.Max)
-	fmt.Fprintf(&b, "心情 %s  %d/%d\n", bar(p.Mood, c.Balance.Mood.Max), p.Mood, c.Balance.Mood.Max)
+
+	sp, _ := c.SpeciesByID(p.Species)
+	class := p.Class
+	if class == "" {
+		class = "未轉職"
+	}
+	row("名字", "%s", p.Name)
+	row("物種", "%s", sp.Name)
+	row("職業", "%s", class)
+	row("進化", "第 %d 階段", p.Stage)
+	if cost := c.Cost(p.Level); cost > 0 {
+		row("等級", "Lv %d（XP %d/%d）", p.Level, p.XP, cost)
+	} else {
+		row("等級", "Lv %d（已達最高等級）", p.Level)
+	}
+	row("HP  ", "%d/%d", p.HP, c.MaxHP(p.Level))
+	row("飽足", "%d/%d", p.Satiety, c.Balance.Satiety.Max)
+	row("心情", "%d/%d", p.Mood, c.Balance.Mood.Max)
 
 	sup := c.Balance.Supply
 	left := sup.CommitsPerDay
@@ -42,12 +48,12 @@ func Status(s engine.State, c *content.Pack, now time.Time) string {
 		left = max(0, left-p.SupplyUsed)
 	}
 	if left > 0 {
-		fmt.Fprintf(&b, "今日補給：接下來 %d 筆 commit 的 XP ×%d\n", left, sup.Multiplier)
+		row("補給", "今天還剩 %d 次（XP ×%d）", left, sup.Multiplier)
 	} else {
-		b.WriteString("今日補給：已用完，明天再來\n")
+		row("補給", "今天已用完")
 	}
 	if p.Satiety < c.Balance.Satiety.HungryBelow {
-		b.WriteString("肚子餓了：commit 的 XP 減半，多 commit 餵牠吧。\n")
+		row("狀態", "肚子餓了，commit 的 XP 減半")
 	}
 	return b.String()
 }
@@ -62,12 +68,4 @@ func Log(lines []engine.LogLine) string {
 		fmt.Fprintf(&b, "%s  %s\n", l.At.Format("01/02 15:04"), l.Text)
 	}
 	return b.String()
-}
-
-func bar(v, limit int) string {
-	n := 0
-	if limit > 0 {
-		n = min(barWidth, max(0, v*barWidth/limit))
-	}
-	return strings.Repeat("█", n) + strings.Repeat("░", barWidth-n)
 }

@@ -126,7 +126,7 @@ func hatch(r *Result, e event.Event, c *content.Pack) {
 	}
 	b := c.Balance
 	r.State.Pet = Pet{
-		Species: sp.ID, Name: name, Level: 1, HP: c.MaxHP(1),
+		Species: sp.ID, Name: name, Stage: 1, Level: 1, HP: c.MaxHP(1),
 		Satiety: b.Satiety.Start, Mood: b.Mood.Start,
 	}
 	r.log(e.At, c, c.Logs.Hatch, nil)

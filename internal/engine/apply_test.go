@@ -22,7 +22,7 @@ var testPack = &content.Pack{
 		Satiety: content.Satiety{Gauge: content.Gauge{Start: 800, Max: 1000, DecayEveryMinutes: 60, DecayAmount: 10}, HungryBelow: 200},
 		Mood:    content.Mood{Gauge: content.Gauge{Start: 500, Max: 1000, DecayEveryMinutes: 60, DecayAmount: 10}, PerPet: 50},
 	},
-	Species: []content.Species{{ID: "slime", Name: "史萊姆"}},
+	Species: []content.Species{{ID: "slime", Name: "史萊姆", Aliases: []string{"jelly"}}},
 	Logs: content.Logs{
 		Hatch: "孵出{species}「{name}」", AlreadyHatched: "已有{name}", Levelup: "{name} Lv{level}",
 		Supply: "補給", Hungry: "餓", Pet: "摸{name}", NoPet: "沒有寵物",
@@ -85,9 +85,11 @@ func TestHatch(t *testing.T) {
 		logs string
 	}{
 		{"孵出寵物", State{}, hatchEv(t0, "slime", "小橘"),
-			Pet{Species: "slime", Name: "小橘", Level: 1, HP: 20, Satiety: 800, Mood: 500}, "孵出史萊姆「小橘」"},
+			Pet{Species: "slime", Name: "小橘", Stage: 1, Level: 1, HP: 20, Satiety: 800, Mood: 500}, "孵出史萊姆「小橘」"},
 		{"沒取名就用物種名", State{}, hatchEv(t0, "slime", ""),
-			Pet{Species: "slime", Name: "史萊姆", Level: 1, HP: 20, Satiety: 800, Mood: 500}, "孵出史萊姆「史萊姆」"},
+			Pet{Species: "slime", Name: "史萊姆", Stage: 1, Level: 1, HP: 20, Satiety: 800, Mood: 500}, "孵出史萊姆「史萊姆」"},
+		{"舊 id 孵出時存正式 id", State{}, hatchEv(t0, "jelly", "小橘"),
+			Pet{Species: "slime", Name: "小橘", Stage: 1, Level: 1, HP: 20, Satiety: 800, Mood: 500}, "孵出史萊姆「小橘」"},
 		{"未知物種不孵", State{}, hatchEv(t0, "unicorn", "x"), Pet{}, ""},
 		{"已經有寵物", hatched, hatchEv(t0, "slime", "阿呆"), hatched.Pet, "已有小橘"},
 	}

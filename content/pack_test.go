@@ -10,7 +10,7 @@ func TestDefaultParses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Hash == "" || len(p.Species) != 4 || p.Cost(1) == 0 {
+	if p.Hash == "" || len(p.Species) != 8 || p.Cost(1) == 0 {
 		t.Fatalf("內容未載入: hash=%q species=%d", p.Hash, len(p.Species))
 	}
 }
@@ -46,6 +46,7 @@ func TestParseRejects(t *testing.T) {
 		"balance 壞掉":   {Balance: []byte("xp: ["), Species: ok.Species, Logs: ok.Logs},
 		"沒有 other":     {Balance: bytes.Replace(ok.Balance, []byte("other: 10"), []byte("misc: 10"), 1), Species: ok.Species, Logs: ok.Logs},
 		"物種重複":         {Balance: ok.Balance, Species: []byte("- {id: a, name: A}\n- {id: a, name: B}\n"), Logs: ok.Logs},
+		"舊 id 與 id 重複": {Balance: ok.Balance, Species: []byte("- {id: a, name: A}\n- {id: b, name: B, aliases: [a]}\n"), Logs: ok.Logs},
 		"沒有物種":         {Balance: ok.Balance, Species: []byte("[]"), Logs: ok.Logs},
 		"日誌沒有 other":   {Balance: ok.Balance, Species: ok.Species, Logs: []byte("commit: {feat: [x]}")},
 	}
@@ -55,5 +56,17 @@ func TestParseRejects(t *testing.T) {
 				t.Fatal("應該回傳錯誤")
 			}
 		})
+	}
+}
+
+// 舊物種「人類騎士」（knight）併入人族：舊存檔的孵蛋事件要能對應到 human。
+func TestSpeciesAliases(t *testing.T) {
+	p, _ := Default()
+	sp, ok := p.SpeciesByID("knight")
+	if !ok || sp.ID != "human" || sp.Name != "人族" {
+		t.Fatalf("knight → %+v %v", sp, ok)
+	}
+	if _, ok := p.SpeciesByID("slime"); ok {
+		t.Fatal("slime 已移除")
 	}
 }

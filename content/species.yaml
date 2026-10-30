@@ -1,36 +1,28 @@
-# 可孵化的物種。id 寫進事件，改名字或圖不影響重播；刪掉 id 會讓舊存檔無法顯示。
-# art 是第一階段（幼年）的 ASCII 圖，每行不超過 16 個半形字元。
-# `|2` 固定去掉 4 格縮排（清單項目 2 格 + 2），圖的第一行才能比後面縮得多。
+# 可孵化的物種（種族）。id 寫進事件，改 name 不影響重播。
+# 不要刪除或改名已經用過的 id：舊存檔會找不到物種。要換 id 時，把舊 id 留在 aliases，
+# 重播時舊事件會對應到新物種。
 
-- id: slime
-  name: 史萊姆
-  art: |2
-       .-""-.
-      / o  o \
-     |   ~~   |
-      '------'
+- id: human
+  name: 人族
+  aliases: [knight] # 舊物種「人類騎士」，2026-10-30 併入人族
 
-- id: drake
-  name: 幼龍
-  art: |2
-      /\_/\  ,
-     ( o.o )/
-      > ^ <\
-     /_/ \_\
+- id: elf
+  name: 精靈族
 
-- id: owl
-  name: 貓頭鷹
-  art: |2
-      ,___,
-      (O,O)
-      /)_)
-      """"
+- id: orc
+  name: 獸人族
 
-- id: knight
-  name: 人類騎士
-  art: |2
-        _/^\_    |
-       [ o o ]   |
-        \_=_/  --+--
-        /|#|\
-        _/ \_
+- id: ratkin
+  name: 鼠人族
+
+- id: dwarf
+  name: 矮人族
+
+- id: undead
+  name: 不死族
+
+- id: demon
+  name: 惡魔族
+
+- id: dragonkin
+  name: 龍人族

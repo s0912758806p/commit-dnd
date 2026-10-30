@@ -58,10 +58,10 @@ func TestHatchCommitStatusLog(t *testing.T) {
 	if _, err := dnd(t, "hatch", "--species", "unicorn"); err == nil {
 		t.Fatal("未知物種應報錯")
 	}
-	if out, err := dnd(t, "hatch", "--species", "slime", "--name", "小橘"); err != nil || !strings.Contains(out, "小橘") {
+	if out, err := dnd(t, "hatch", "--species", "elf", "--name", "小橘"); err != nil || !strings.Contains(out, "小橘") {
 		t.Fatalf("hatch: %v\n%s", err, out)
 	}
-	if _, err := dnd(t, "hatch", "--species", "owl"); err == nil {
+	if _, err := dnd(t, "hatch", "--species", "orc"); err == nil {
 		t.Fatal("已有寵物應報錯")
 	}
 
@@ -70,7 +70,7 @@ func TestHatchCommitStatusLog(t *testing.T) {
 		t.Fatalf("hook 應安靜成功: %v %q", err, out)
 	}
 	out, err := dnd(t, "status")
-	if err != nil || !strings.Contains(out, "小橘（史萊姆）Lv 2") {
+	if err != nil || !strings.Contains(out, "名字  小橘") || !strings.Contains(out, "等級  Lv 2") {
 		t.Fatalf("status: %v\n%s", err, out)
 	}
 	out, err = dnd(t, "log")
