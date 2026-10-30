@@ -36,6 +36,8 @@ make test   # go test ./...
 make ci     # gofmt 檢查、go vet、go test -race（commit 前跑）
 ```
 
+GitHub Actions（`.github/workflows/ci.yml`）在每個 PR 與 push 到 `main` 時跑同一個 `make ci`。
+
 架構：adapter 把外部輸入轉成 `event.Event` → `engine.Apply`（純函式）算出新狀態 → `store` 在檔案鎖內追加事件並原子寫入 state.json。
 
 ```
