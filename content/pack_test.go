@@ -1,27 +1,57 @@
 package content
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 func TestDefaultParses(t *testing.T) {
 	p, err := Default()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Hash == "" || p.Balance.Mood.Max == 0 {
-		t.Fatalf("內容未載入: %+v", p)
+	if p.Hash == "" || len(p.Species) != 3 || p.Cost(1) == 0 {
+		t.Fatalf("內容未載入: hash=%q species=%d", p.Hash, len(p.Species))
+	}
+}
+
+// 迭代 1 的驗收「第一次 commit 升到 Lv 2」依賴這條：最低的基本 XP × 補給倍率 ≥ Lv1→2 的成本。
+func TestFirstCommitAlwaysReachesLevel2(t *testing.T) {
+	p, _ := Default()
+	lowest := p.Balance.Commit.Base["other"]
+	for _, xp := range p.Balance.Commit.Base {
+		lowest = min(lowest, xp)
+	}
+	if got := lowest * p.Balance.Supply.Multiplier; got < p.Cost(1) {
+		t.Fatalf("最低 commit XP %d < Lv1→2 成本 %d", got, p.Cost(1))
+	}
+}
+
+// docs/DESIGN-NOTES.md 寫死的數字（Lv29→30 為 1433、到 Lv30 共 18,795）綁住實算值。
+func TestXPTableMatchesDesignNotes(t *testing.T) {
+	p, _ := Default()
+	total := 0
+	for n := 1; n < 30; n++ {
+		total += p.Cost(n)
+	}
+	if p.Cost(1) != 18 || p.Cost(29) != 1433 || total != 18795 {
+		t.Fatalf("Cost(1)=%d Cost(29)=%d total=%d", p.Cost(1), p.Cost(29), total)
 	}
 }
 
 func TestParseRejects(t *testing.T) {
-	cases := map[string]string{
-		"未知欄位":     "mood: {start: 1, max: 10, decay_every_minutes: 1, typo: 1}",
-		"週期為 0":    "mood: {start: 1, max: 10, decay_every_minutes: 0}",
-		"起始超過上限":   "mood: {start: 11, max: 10, decay_every_minutes: 1}",
-		"壞掉的 YAML": "mood: [",
+	ok := Embedded()
+	cases := map[string]Files{
+		"balance 未知欄位": {Balance: append(bytes.Clone(ok.Balance), "\ntypo: 1\n"...), Species: ok.Species, Logs: ok.Logs},
+		"balance 壞掉":   {Balance: []byte("xp: ["), Species: ok.Species, Logs: ok.Logs},
+		"沒有 other":     {Balance: bytes.Replace(ok.Balance, []byte("other: 10"), []byte("misc: 10"), 1), Species: ok.Species, Logs: ok.Logs},
+		"物種重複":         {Balance: ok.Balance, Species: []byte("- {id: a, name: A}\n- {id: a, name: B}\n"), Logs: ok.Logs},
+		"沒有物種":         {Balance: ok.Balance, Species: []byte("[]"), Logs: ok.Logs},
+		"日誌沒有 other":   {Balance: ok.Balance, Species: ok.Species, Logs: []byte("commit: {feat: [x]}")},
 	}
-	for name, src := range cases {
+	for name, f := range cases {
 		t.Run(name, func(t *testing.T) {
-			if _, err := Parse([]byte(src)); err == nil {
+			if _, err := Parse(f); err == nil {
 				t.Fatal("應該回傳錯誤")
 			}
 		})

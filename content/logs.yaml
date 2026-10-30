@@ -1,0 +1,31 @@
+# 冒險日誌模板。可用的佔位符：{name} 寵物名、{species} 物種名、{xp} 獲得經驗、
+# {lines} 改動行數、{level} 等級。同一類有多句時，用 commit hash 決定挑哪一句（重播結果不變）。
+
+hatch: "蛋裂開了，{species}「{name}」誕生了！"
+already_hatched: "已經有 {name} 了，蛋放回了倉庫。"
+levelup: "{name} 升到了 Lv {level}！"
+supply: "今天的補給到了，{name} 這次經驗加倍。"
+hungry: "{name} 肚子餓得咕咕叫，這次只拿到一半經驗。"
+pet: "你摸了摸 {name}，牠開心地蹭了蹭你。"
+no_pet: "還沒有寵物。先用 dnd hatch 孵一隻吧。"
+
+commit:
+  feat:
+    - "{name} 開拓了一條新通道，獲得 {xp} XP。"
+    - "{name} 在牆上畫出新的地圖，獲得 {xp} XP。"
+  fix:
+    - "{name} 修好了一座搖搖欲墜的橋，獲得 {xp} XP。"
+    - "{name} 拔掉了陷阱上的機關，獲得 {xp} XP。"
+  test:
+    - "{name} 對著稻草人反覆練習，獲得 {xp} XP。"
+  refactor:
+    - "{name} 把雜亂的背包重新整理了一遍，獲得 {xp} XP。"
+  perf:
+    - "{name} 找到一條更快的捷徑，獲得 {xp} XP。"
+  docs:
+    - "{name} 在冒險手冊上補了幾頁，獲得 {xp} XP。"
+  revert:
+    - "{name} 退回上一個岔路口，獲得 {xp} XP。"
+  other:
+    - "{name} 搬動了 {lines} 塊石頭，獲得 {xp} XP。"
+    - "{name} 在營火旁整理裝備，獲得 {xp} XP。"

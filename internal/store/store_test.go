@@ -29,6 +29,17 @@ func open(t *testing.T, dir string) *FileStore {
 	return s
 }
 
+// openHatched 回傳已孵出寵物的 store（佔用 Seq 1），之後的 pet 事件才會累計 Pets。
+func openHatched(t *testing.T, dir string) *FileStore {
+	t.Helper()
+	s := open(t, dir)
+	e := event.Event{At: t0, Source: event.SourceUser, Type: "hatch", Args: map[string]string{"species": "slime", "name": "小橘"}}
+	if _, err := s.Update(e); err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
 func pet(i int) event.Event {
 	return event.Event{At: t0.Add(time.Duration(i) * 7 * time.Minute), Source: event.SourceUser, Type: "pet"}
 }
@@ -48,13 +59,13 @@ func countLines(t *testing.T, dir string) int {
 
 func TestUpdateAssignsSeqAndPersists(t *testing.T) {
 	dir := t.TempDir()
-	s := open(t, dir)
+	s := openHatched(t, dir)
 	for i := range 3 {
 		r, err := s.Update(pet(i))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.State.LastSeq != int64(i+1) {
+		if r.State.LastSeq != int64(i+2) {
 			t.Fatalf("LastSeq = %d", r.State.LastSeq)
 		}
 	}
@@ -62,7 +73,7 @@ func TestUpdateAssignsSeqAndPersists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.LastSeq != 3 || st.Pet.Pets != 3 {
+	if st.LastSeq != 4 || st.Pet.Pets != 3 {
 		t.Fatalf("Load = %+v", st)
 	}
 
@@ -71,7 +82,7 @@ func TestUpdateAssignsSeqAndPersists(t *testing.T) {
 	if err := json.Unmarshal(line, &first); err != nil {
 		t.Fatal(err)
 	}
-	if first.Seq != 1 || first.V != event.Version || first.At.Location() != time.UTC {
+	if _, off := first.At.Zone(); first.Seq != 1 || first.V != event.Version || off != 8*3600 {
 		t.Fatalf("第一筆事件 = %+v", first)
 	}
 }
@@ -86,7 +97,7 @@ func TestLoadWithoutData(t *testing.T) {
 // 迭代 0 的驗收：刪掉 state.json 後 Rebuild 得到逐位元組相同的 state.json。
 func TestRebuildAfterDeletingState(t *testing.T) {
 	dir := t.TempDir()
-	s := open(t, dir)
+	s := openHatched(t, dir)
 	for i := range 5 {
 		if _, err := s.Update(pet(i)); err != nil {
 			t.Fatal(err)
@@ -109,6 +120,7 @@ func TestRebuildAfterDeletingState(t *testing.T) {
 func TestConcurrentUpdatesLoseNothing(t *testing.T) {
 	dir := t.TempDir()
 	const n = 20
+	openHatched(t, dir)
 	var wg sync.WaitGroup
 	errs := make(chan error, n)
 	for i := range n {
@@ -130,7 +142,7 @@ func TestConcurrentUpdatesLoseNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.LastSeq != n || st.Pet.Pets != n || countLines(t, dir) != n {
+	if st.LastSeq != n+1 || st.Pet.Pets != n || countLines(t, dir) != n+1 {
 		t.Fatalf("LastSeq=%d Pets=%d lines=%d", st.LastSeq, st.Pet.Pets, countLines(t, dir))
 	}
 }
@@ -138,7 +150,7 @@ func TestConcurrentUpdatesLoseNothing(t *testing.T) {
 // 模擬「追加事件後、寫 state.json 前」當機：state.json 落後，下一次 Update 要先補上。
 func TestUpdateCatchesUpStaleState(t *testing.T) {
 	dir := t.TempDir()
-	s := open(t, dir)
+	s := openHatched(t, dir)
 	if _, err := s.Update(pet(0)); err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +166,7 @@ func TestUpdateCatchesUpStaleState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.State.LastSeq != 3 || r.State.Pet.Pets != 3 {
+	if r.State.LastSeq != 4 || r.State.Pet.Pets != 3 {
 		t.Fatalf("沒有補上落後的狀態: %+v", r.State)
 	}
 }
@@ -162,7 +174,7 @@ func TestUpdateCatchesUpStaleState(t *testing.T) {
 // 當機留下半行：重播略過它並截掉，之後的追加不會黏在半行後面。
 func TestTornTailIsTruncated(t *testing.T) {
 	dir := t.TempDir()
-	s := open(t, dir)
+	s := openHatched(t, dir)
 	for i := range 2 {
 		if _, err := s.Update(pet(i)); err != nil {
 			t.Fatal(err)
@@ -172,14 +184,14 @@ func TestTornTailIsTruncated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.WriteString(`{"v":1,"seq":3,"at":"2026-`)
+	f.WriteString(`{"v":1,"seq":4,"at":"2026-`)
 	f.Close()
 
 	r, err := s.Update(pet(2))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.State.LastSeq != 3 || countLines(t, dir) != 3 {
+	if r.State.LastSeq != 4 || countLines(t, dir) != 4 {
 		t.Fatalf("LastSeq=%d lines=%d", r.State.LastSeq, countLines(t, dir))
 	}
 	if _, err := s.Rebuild(); err != nil {
@@ -216,5 +228,49 @@ func TestLockTimeout(t *testing.T) {
 	s.LockTimeout = 30 * time.Millisecond
 	if _, err := s.Update(pet(0)); err != ErrBusy {
 		t.Fatalf("err = %v, want ErrBusy", err)
+	}
+}
+
+// state.json 是舊版格式時，Load 在記憶體重播、Update 重播後覆寫。
+func TestOutdatedStateIsRebuilt(t *testing.T) {
+	dir := t.TempDir()
+	s := openHatched(t, dir)
+	if _, err := s.Update(pet(0)); err != nil {
+		t.Fatal(err)
+	}
+	statePath := filepath.Join(dir, stateFile)
+	old := bytes.Replace(readFile(t, statePath), []byte(`"v": 2,`), []byte(`"v": 1,`), 1)
+	old = bytes.Replace(old, []byte(`"pets": 1,`), []byte(`"pets": 99,`), 1)
+	if err := os.WriteFile(statePath, old, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st, err := s.Load()
+	if err != nil || st.Pet.Pets != 1 || st.V != 2 {
+		t.Fatalf("Load 沒有重播: pets=%d v=%d err=%v", st.Pet.Pets, st.V, err)
+	}
+	if !bytes.Equal(readFile(t, statePath), old) {
+		t.Fatal("Load 不可寫檔")
+	}
+	r, err := s.Update(pet(1))
+	if err != nil || r.State.Pet.Pets != 2 {
+		t.Fatalf("Update 沒有重播: %+v %v", r.State.Pet, err)
+	}
+}
+
+func TestHistory(t *testing.T) {
+	dir := t.TempDir()
+	s := openHatched(t, dir)
+	if _, err := s.Update(pet(1)); err != nil {
+		t.Fatal(err)
+	}
+	logs, err := s.History()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(logs) != 2 || !logs[0].At.Equal(t0) || logs[1].Text == "" {
+		t.Fatalf("logs = %+v", logs)
+	}
+	if logs, err := open(t, t.TempDir()).History(); err != nil || len(logs) != 0 {
+		t.Fatalf("沒有資料時: %v %v", logs, err)
 	}
 }

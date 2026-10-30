@@ -7,9 +7,12 @@
 // 所以並行的 hook 不會互相蓋掉。拿不到鎖會在 LockTimeout 後回傳 ErrBusy，由呼叫端決定是否靜默放棄。
 //
 // state.json 記錄它對應到 events.jsonl 的位元組數（events_bytes）。兩者不一致代表上次在
-// 「追加事件後、寫 state 前」中斷，Update 會先重播補上。events.jsonl 結尾若有當機留下的半行，
-// 重播時略過並截掉；中間行損毀則回傳錯誤，不默默丟資料。
-// Load 不取鎖：state.json 以 rename 原子替換，讀到的一定是完整檔案。
+// 「追加事件後、寫 state 前」中斷，Update 會先重播補上；state.json 的版本與 engine.StateVersion
+// 不符時同樣重播。events.jsonl 結尾若有當機留下的半行，重播時略過並截掉；中間行損毀則回傳錯誤，
+// 不默默丟資料。事件的 At 保留 adapter 給的時區（每日補給依當地日期），只去掉單調時鐘。
+//
+// Load 與 History 不取鎖、不寫檔：state.json 以 rename 原子替換，讀到的一定是完整檔案；
+// 版本不符時 Load 只在記憶體重播。
 package store
 
 import (
@@ -64,7 +67,30 @@ func (s *FileStore) path(name string) string { return filepath.Join(s.dir, name)
 // Load 讀取 state.json；還沒有任何資料時回傳零值 State（V == 0）。
 func (s *FileStore) Load() (engine.State, error) {
 	snap, err := s.readSnapshot()
+	if err != nil || !outdated(snap) {
+		return snap.State, err
+	}
+	data, err := s.readEvents()
+	if err != nil {
+		return engine.State{}, err
+	}
+	snap, _, err = s.replayData(data, nil)
 	return snap.State, err
+}
+
+// History 從 events.jsonl 重播，回傳所有冒險日誌（舊到新）。日誌不另外存檔，永遠由事件重算。
+func (s *FileStore) History() ([]engine.LogLine, error) {
+	data, err := s.readEvents()
+	if err != nil {
+		return nil, err
+	}
+	var logs []engine.LogLine
+	_, _, err = s.replayData(data, func(r engine.Result) { logs = append(logs, r.Logs...) })
+	return logs, err
+}
+
+func outdated(snap snapshot) bool {
+	return snap.V != 0 && snap.V != engine.StateVersion
 }
 
 func (s *FileStore) Update(e event.Event) (engine.Result, error) {
@@ -82,7 +108,7 @@ func (s *FileStore) Update(e event.Event) (engine.Result, error) {
 	if err != nil {
 		return engine.Result{}, err
 	}
-	if snap.EventsBytes != size {
+	if snap.EventsBytes != size || outdated(snap) {
 		if snap, err = s.replay(); err != nil {
 			return engine.Result{}, err
 		}
@@ -90,7 +116,7 @@ func (s *FileStore) Update(e event.Event) (engine.Result, error) {
 
 	e.V = event.Version
 	e.Seq = snap.LastSeq + 1
-	e.At = e.At.UTC()
+	e.At = e.At.Round(0) // 去掉單調時鐘，保留時區
 	r := engine.Apply(snap.State, e, s.pack)
 
 	n, err := s.appendEvent(e)
@@ -134,14 +160,25 @@ func (s *FileStore) lock() (unlock func(), err error) {
 
 // replay 必須在鎖內呼叫：它可能截掉 events.jsonl 結尾的半行。
 func (s *FileStore) replay() (snapshot, error) {
-	data, err := os.ReadFile(s.path(eventsFile))
-	if errors.Is(err, os.ErrNotExist) {
-		return snapshot{}, nil
-	}
+	data, err := s.readEvents()
 	if err != nil {
 		return snapshot{}, err
 	}
+	snap, torn, err := s.replayData(data, nil)
+	if err != nil {
+		return snapshot{}, err
+	}
+	if torn {
+		if err := os.Truncate(s.path(eventsFile), snap.EventsBytes); err != nil {
+			return snapshot{}, err
+		}
+	}
+	return snap, nil
+}
 
+// replayData 依序套用每一行事件；visit 不為 nil 時收到每個事件的 Result。
+// torn 表示結尾有當機留下的半行（已略過）。
+func (s *FileStore) replayData(data []byte, visit func(engine.Result)) (snap snapshot, torn bool, err error) {
 	var st engine.State
 	good := 0
 	for good < len(data) {
@@ -154,17 +191,24 @@ func (s *FileStore) replay() (snapshot, error) {
 			if good+nl+1 == len(data) {
 				break // 最後一行壞掉，同樣視為半行
 			}
-			return snapshot{}, fmt.Errorf("%s 在位元組 %d 損毀: %w", eventsFile, good, err)
+			return snapshot{}, false, fmt.Errorf("%s 在位元組 %d 損毀: %w", eventsFile, good, err)
 		}
-		st = engine.Apply(st, e, s.pack).State
+		r := engine.Apply(st, e, s.pack)
+		if visit != nil {
+			visit(r)
+		}
+		st = r.State
 		good += nl + 1
 	}
-	if good < len(data) {
-		if err := os.Truncate(s.path(eventsFile), int64(good)); err != nil {
-			return snapshot{}, err
-		}
+	return snapshot{State: st, EventsBytes: int64(good)}, good < len(data), nil
+}
+
+func (s *FileStore) readEvents() ([]byte, error) {
+	data, err := os.ReadFile(s.path(eventsFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
 	}
-	return snapshot{State: st, EventsBytes: int64(good)}, nil
+	return data, err
 }
 
 func (s *FileStore) eventsSize() (int64, error) {
