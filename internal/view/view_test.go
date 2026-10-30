@@ -48,6 +48,7 @@ func TestStatus(t *testing.T) {
 		"status.txt":        pet,
 		"status_hungry.txt": func() engine.Pet { p := pet; p.Species, p.Satiety, p.SupplyUsed = "owl", 120, 3; return p }(),
 		"status_newday.txt": func() engine.Pet { p := pet; p.Species, p.SupplyDay, p.SupplyUsed = "drake", "2026-10-29", 3; return p }(),
+		"status_knight.txt": func() engine.Pet { p := pet; p.Species, p.Name = "knight", "GR騎士"; return p }(),
 		"status_maxlevel.txt": func() engine.Pet {
 			p := pet
 			p.Level, p.HP = c.Balance.XP.MaxLevel, c.MaxHP(c.Balance.XP.MaxLevel)

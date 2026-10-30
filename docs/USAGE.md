@@ -17,7 +17,7 @@ make install   # 等同 go install ./cmd/dnd，安裝到 $(go env GOPATH)/bin �
 ## 開始玩
 
 ```bash
-dnd hatch            # 選物種（史萊姆、幼龍、貓頭鷹）並取名；也可以用 --species slime --name 小橘
+dnd hatch            # 選物種（史萊姆、幼龍、貓頭鷹、人類騎士）並取名；也可以用 --species slime --name 小橘
 cd 你的-repo
 dnd install git      # 在這個 repo 的 post-commit 加入 dnd
 git commit -m "feat: ..."

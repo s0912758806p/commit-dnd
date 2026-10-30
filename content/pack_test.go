@@ -10,7 +10,7 @@ func TestDefaultParses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Hash == "" || len(p.Species) != 3 || p.Cost(1) == 0 {
+	if p.Hash == "" || len(p.Species) != 4 || p.Cost(1) == 0 {
 		t.Fatalf("內容未載入: hash=%q species=%d", p.Hash, len(p.Species))
 	}
 }
