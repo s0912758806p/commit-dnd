@@ -3,7 +3,7 @@ package engine
 import "time"
 
 // StateVersion 是 state.json 的格式版本。state.json 只是快取，版本不符時 store 會從 events.jsonl 重建。
-const StateVersion = 2
+const StateVersion = 3
 
 // State 是遊戲的完整狀態。所有數值一律用整數，確保 JSON 往返與跨平台重播結果完全相同。
 // State 必須保持可比較（不含 map／slice），測試直接用 == 比對。
@@ -20,6 +20,8 @@ type State struct {
 type Pet struct {
 	Species string `json:"species"` // 空字串表示還沒孵
 	Name    string `json:"name"`
+	Class   string `json:"class"` // 職業；空字串表示尚未轉職（迭代 5 實作轉職）
+	Stage   int    `json:"stage"` // 進化階段，孵出時為 1（迭代 5 實作進化）
 	Level   int    `json:"level"`
 	XP      int    `json:"xp"` // 本級已累積的 XP，升級時扣掉該級成本
 	HP      int    `json:"hp"`

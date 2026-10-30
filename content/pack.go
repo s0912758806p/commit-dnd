@@ -1,6 +1,6 @@
 // Package content 載入嵌入在執行檔裡的 YAML 遊戲內容（content.Pack）。
 //
-// balance.yaml（數值）、species.yaml（物種與 ASCII 圖）、logs.yaml（冒險日誌模板）
+// balance.yaml（數值）、species.yaml（物種）、logs.yaml（冒險日誌模板）
 // 以 go:embed 編進執行檔，所以調整內容只要重新編譯。XP 曲線在載入時預先算成整數表，
 // 引擎與 State 內不出現浮點。Pack.Hash 是三個檔案的雜湊，引擎把它寫進 State.ContentHash，
 // 用來偵測「用不同內容重播」造成的差異。測試可以直接組一個 &Pack{...} 注入，不必經過 YAML。
@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"slices"
 	"sync"
 
 	"go.yaml.in/yaml/v3"
@@ -95,9 +96,9 @@ type Mood struct {
 }
 
 type Species struct {
-	ID   string `yaml:"id"`
-	Name string `yaml:"name"`
-	Art  string `yaml:"art"`
+	ID      string   `yaml:"id"`
+	Name    string   `yaml:"name"`
+	Aliases []string `yaml:"aliases"` // 舊 id；重播舊事件時對應到這個物種
 }
 
 type Logs struct {
@@ -176,10 +177,15 @@ func (p *Pack) validate() error {
 	}
 	seen := map[string]bool{}
 	for _, s := range p.Species {
-		if s.ID == "" || s.Name == "" || seen[s.ID] {
-			return fmt.Errorf("species.yaml: id 與 name 不可為空、id 不可重複（%q）", s.ID)
+		if s.ID == "" || s.Name == "" {
+			return fmt.Errorf("species.yaml: id 與 name 不可為空（%q）", s.ID)
 		}
-		seen[s.ID] = true
+		for _, id := range append([]string{s.ID}, s.Aliases...) {
+			if id == "" || seen[id] {
+				return fmt.Errorf("species.yaml: id 與 aliases 不可為空或重複（%q）", id)
+			}
+			seen[id] = true
+		}
 	}
 
 	if len(p.Logs.Commit["other"]) == 0 {
@@ -193,10 +199,10 @@ func (p *Pack) validate() error {
 	return nil
 }
 
-// SpeciesByID 找出物種；找不到回傳 false。
+// SpeciesByID 用 id 或舊 id（aliases）找出物種；找不到回傳 false。
 func (p *Pack) SpeciesByID(id string) (Species, bool) {
 	for _, s := range p.Species {
-		if s.ID == id {
+		if s.ID == id || slices.Contains(s.Aliases, id) {
 			return s, true
 		}
 	}
