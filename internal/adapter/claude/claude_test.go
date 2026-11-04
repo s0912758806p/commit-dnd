@@ -11,9 +11,9 @@ import (
 
 var now = time.Date(2026, 11, 4, 9, 0, 0, 0, time.FixedZone("CST", 8*3600))
 
-// testdata/*.json：post_tool_use_* 是 Claude Code 2.1.318 實際送給 hook 的 stdin，
+// testdata/*.json：post_tool_use_*、stop 是 Claude Code 2.1.318 實際送給 hook 的 stdin，
 // 經去識別化（保留欄位結構，字串換成假資料，cwd 一律為 /home/user/src/commit-dnd）；
-// stop.json、session_start.json 依官方文件格式手寫。
+// session_start.json 依官方文件格式手寫。
 func TestParseSamples(t *testing.T) {
 	cases := map[string]*event.Event{
 		"post_tool_use_edit.json":  {Type: "tool_use", Tool: "Edit", Repo: "commit-dnd"},
