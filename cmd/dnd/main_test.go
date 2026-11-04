@@ -192,3 +192,30 @@ func TestHookClaude(t *testing.T) {
 		t.Fatalf("應寫入 2 個事件，實際 %d:\n%s", n, b)
 	}
 }
+
+func TestDungeon(t *testing.T) {
+	t.Setenv("DND_HOME", t.TempDir())
+	if out, err := dnd(t, "dungeon"); err != nil || out != "還沒有寵物。用 dnd hatch 孵一隻吧。\n" {
+		t.Fatalf("沒有寵物時應提示孵蛋: %v %q", err, out)
+	}
+	if _, err := dnd(t, "hatch", "--species", "elf", "--name", "小精"); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := dnd(t, "dungeon"); err != nil || !strings.HasPrefix(out, "樓層  入口\n") {
+		t.Fatalf("剛孵出來應在入口: %v\n%s", err, out)
+	}
+}
+
+// warp 的參數由 CLI 檢查；能不能傳送由引擎判斷，這裡不測。
+func TestWarpArgs(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("DND_HOME", home)
+	for _, args := range [][]string{{"warp"}, {"warp", "abc"}, {"warp", "-3"}, {"warp", "1.5"}, {"warp", "10", "20"}} {
+		if _, err := dnd(t, args...); err == nil {
+			t.Fatalf("%v 應報錯", args)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(home, "events.jsonl")); !os.IsNotExist(err) {
+		t.Fatalf("參數錯誤時不應寫入事件: %v", err)
+	}
+}
