@@ -3,7 +3,7 @@ package engine
 import "time"
 
 // StateVersion 是 state.json 的格式版本。state.json 只是快取，版本不符時 store 會從 events.jsonl 重建。
-const StateVersion = 3
+const StateVersion = 4
 
 // State 是遊戲的完整狀態。所有數值一律用整數，確保 JSON 往返與跨平台重播結果完全相同。
 // State 必須保持可比較（不含 map／slice），測試直接用 == 比對。
@@ -15,6 +15,24 @@ type State struct {
 	// LastCommit 是最後一筆計分的 commit hash；同一個 hash 再來（hook 重跑、重複安裝）不重複計分。
 	LastCommit string `json:"last_commit"`
 	Pet        Pet    `json:"pet"`
+	AI         AI     `json:"ai"`
+}
+
+// AI 是 Claude Code／Codex 的活動統計。迭代 2 只計數；迭代 3 起 AI 回合會推進地下城。
+type AI struct {
+	Turns    int `json:"turns"`     // 累計 AI 回合（Claude 的 Stop）
+	ToolUses int `json:"tool_uses"` // 累計工具呼叫（Claude 的 PostToolUse）
+	// TodayTurns 是 Day（當地日期 YYYY-MM-DD）當天的 AI 回合數。
+	Day        string `json:"day"`
+	TodayTurns int    `json:"today_turns"`
+}
+
+// TurnsOn 回傳某個當地日期的 AI 回合數；不是記錄中的那天時為 0。
+func (a AI) TurnsOn(day string) int {
+	if day != a.Day {
+		return 0
+	}
+	return a.TodayTurns
 }
 
 type Pet struct {

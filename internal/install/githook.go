@@ -44,8 +44,7 @@ func GitHooksDir(repo string) (string, error) {
 
 // Block 回傳要寫進 post-commit 的區塊。
 func Block(dndPath string) string {
-	quoted := "'" + strings.ReplaceAll(dndPath, "'", `'\''`) + "'"
-	return blockBegin + "\n" + quoted + " hook git >/dev/null 2>&1 || true\n" + blockEnd + "\n"
+	return blockBegin + "\n" + shellQuote(dndPath) + " hook git >/dev/null 2>&1 || true\n" + blockEnd + "\n"
 }
 
 // InstallGitHook 在 hooksDir/post-commit 寫入或更新 dnd 區塊，回傳給使用者看的結果說明。
