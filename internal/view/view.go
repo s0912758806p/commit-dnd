@@ -1,4 +1,4 @@
-// Package view 把 State 與日誌排成給人看的文字（status、statusline、dungeon、log）。只讀資料、不做遊戲判斷：
+// Package view 把 State 與日誌排成給人看的文字（status、statusline、dungeon、class、sim、log）。只讀資料、不做遊戲判斷：
 // 呼叫端負責先套用 tick（status 看到的是「現在」的狀態），這裡只負責排版。
 // 輸出格式由 testdata/golden/*.txt 守住，改版面時用 `go test ./internal/view -update` 更新。
 package view
@@ -28,20 +28,16 @@ func Status(s engine.State, c *content.Pack, now time.Time) string {
 	}
 
 	sp, _ := c.SpeciesByID(p.Species)
-	class := p.Class
-	if class == "" {
-		class = "未轉職"
-	}
 	row("名字", "%s", p.Name)
 	row("物種", "%s", sp.Name)
-	row("職業", "%s", class)
-	row("進化", "第 %d 階段", p.Stage)
+	row("職業", "%s", className(p, c))
+	row("進化", "%s", stageName(p, c))
 	if cost := c.Cost(p.Level); cost > 0 {
 		row("等級", "Lv %d（XP %d/%d）", p.Level, p.XP, cost)
 	} else {
 		row("等級", "Lv %d（已達最高等級）", p.Level)
 	}
-	row("HP  ", "%d/%d", p.HP, c.MaxHP(p.Level))
+	row("HP  ", "%d/%d", p.HP, engine.MaxHP(p, c))
 	row("飽足", "%d/%d", p.Satiety, c.Balance.Satiety.Max)
 	row("心情", "%d/%d", p.Mood, c.Balance.Mood.Max)
 
@@ -76,7 +72,7 @@ func Statusline(s engine.State, c *content.Pack, now time.Time) string {
 	if cost := c.Cost(p.Level); cost > 0 {
 		parts = append(parts, fmt.Sprintf("XP %d/%d", p.XP, cost))
 	}
-	parts = append(parts, fmt.Sprintf("HP %d/%d", p.HP, c.MaxHP(p.Level)))
+	parts = append(parts, fmt.Sprintf("HP %d/%d", p.HP, engine.MaxHP(p, c)))
 	satiety := fmt.Sprintf("飽足 %d", p.Satiety)
 	if p.Satiety < c.Balance.Satiety.HungryBelow {
 		satiety += "（餓）"

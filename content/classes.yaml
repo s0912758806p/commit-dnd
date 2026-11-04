@@ -1,0 +1,127 @@
+# 職業、特化與進化（迭代 5）。改完重新編譯（go:embed）即生效；id 會寫進事件與 state.json，
+# 改 name 不影響存檔，但不要刪除或改名已經用過的 id。
+#
+# 加成一律是百分比（整數），加在「不含裝備」的基礎值上，職業＋特化＋進化相加後一次套用：
+#   攻擊 = (pet_atk_base + pet_atk_per_level × 等級) × (100 + atk)% + 武器強度
+#   防禦 = (pet_def_per_level × 等級) × (100 + def)% + 防具強度
+#   HP 上限 = (hp.base + hp.per_level × (等級 − 1)) × (100 + hp)%
+# 小數無條件捨去。
+
+judge_level: 5   # 升到這級時依 commit 組成判定職業
+spec_level: 15   # 到這級可以用 dnd class choose <特化 id> 選擇特化（一次；要換請用轉職卷軸）
+
+# 職業判定：每個職業的分數 = 它的 kinds 在 commit 組成裡的次數合計 × weight_pct，最高者當選；
+# 同分時取這份清單中較前面的。commit 組成的分類固定為 feat、fix、test、refactor、perf、docs、other
+# （style、chore、ci、build、revert 與不符合 Conventional Commits 的標題都算 other）。
+# weight_pct 用來抵銷「feat 本來就最多」：以使用者幾個 repo 的平均組成（feat 約 45%、docs 20%、
+# fix 17%、test 10%、refactor＋perf 3%）估算，比平均明顯多的那一類才會勝出。
+classes:
+  - id: ranger
+    name: 遊俠
+    style: 開拓型
+    kinds: [feat]
+    weight_pct: 100
+    atk: 20
+    def: 0
+    hp: 10
+    specs:
+      - {id: marksman, name: 神射手,   atk: 20, def: 0,  hp: 0}
+      - {id: wayfarer, name: 荒野行者, atk: 0,  def: 5,  hp: 15}
+
+  - id: cleric
+    name: 神官
+    style: 修補型
+    kinds: [fix]
+    weight_pct: 150
+    atk: 5
+    def: 5
+    hp: 20
+    specs:
+      - {id: exorcist, name: 驅魔師, atk: 15, def: 0,  hp: 5}
+      - {id: oracle,   name: 先知,   atk: 0,  def: 10, hp: 10}
+
+  - id: knight
+    name: 騎士
+    style: 守護型
+    kinds: [test]
+    weight_pct: 250
+    atk: 0
+    def: 20
+    hp: 10
+    specs:
+      - {id: paladin, name: 聖騎士,   atk: 10, def: 5,  hp: 5}
+      - {id: bulwark, name: 鐵壁騎士, atk: 0,  def: 15, hp: 5}
+
+  - id: artificer
+    name: 鍊金術士
+    style: 工匠型
+    kinds: [refactor, perf]
+    weight_pct: 300
+    atk: 10
+    def: 10
+    hp: 10
+    specs:
+      - {id: runesmith,  name: 符文鍛造師, atk: 10, def: 10, hp: 0}
+      - {id: apothecary, name: 秘藥師,     atk: 0,  def: 0,  hp: 20}
+
+  - id: mage
+    name: 法師
+    style: 學者型
+    kinds: [docs]
+    weight_pct: 150
+    atk: 25
+    def: 0
+    hp: 5
+    specs:
+      - {id: elementalist, name: 元素術士, atk: 20, def: 0,  hp: 0}
+      - {id: sage,         name: 賢者,     atk: 0,  def: 10, hp: 10}
+
+  - id: adventurer
+    name: 冒險者
+    style: 萬事通型
+    kinds: [other]
+    weight_pct: 100
+    atk: 10
+    def: 5
+    hp: 15
+    specs:
+      - {id: mercenary, name: 傭兵,   atk: 15, def: 5, hp: 0}
+      - {id: scavenger, name: 拾荒者, atk: 0,  def: 5, hp: 15}
+
+# 進化：依等級分階段，第 1 階段從 Lv 1 開始。升階時能力小幅提升（與職業加成相加，不累加前一階段）。
+stages:
+  - {level: 1,  atk: 0,  def: 0,  hp: 0}
+  - {level: 10, atk: 5,  def: 5,  hp: 5}
+  - {level: 20, atk: 10, def: 10, hp: 10}
+
+# 每個種族每個階段的名稱（只有文字，不畫外型）；數量要和 stages 相同。
+stage_names:
+  human:     [見習者, 勇者, 英雄]
+  elf:       [幼精靈, 森林精靈, 上古精靈]
+  orc:       [獸人幼崽, 部落勇士, 獸人大酋長]
+  ratkin:    [小鼠人, 溝渠潛行者, 鼠王]
+  dwarf:     [矮人學徒, 山丘矮人, 山岳之王]
+  undead:    [骷髏, 幽魂, 巫妖王]
+  demon:     [小鬼, 惡魔, 魔王]
+  dragonkin: [幼龍人, 龍裔, 古龍王]
+
+# 轉職卷軸：打倒 Boss 時有 drop_pct% 的機率掉落（用 commit hash＋樓層＋Seq 決定，重播結果不變），
+# 最多帶 max 張。dnd class reroll 用掉一張，依當時的 commit 組成重新判定職業並清除特化，等級不變。
+scroll:
+  drop_pct: 50
+  max: 3
+
+# 日誌模板。除了 logs.yaml 的 {name}、{level}、{species}，另有：{class} 職業名、{style} 職業類型、
+# {spec} 特化名、{stage} 進化名、{stage_n} 第幾階段、{reason} 原因、{monster} 怪物名、
+# {scrolls}／{scroll_max} 卷軸數量。
+logs:
+  judge: "{name} 依 commit 組成轉職為{class}（{style}）！"
+  spec_ready: "{name} 可以選擇特化了，用 dnd class 看看有哪些方向。"
+  spec_chosen: "{name} 選擇了特化「{spec}」。"
+  spec_denied: "無法選擇特化「{spec}」：{reason}。"
+  evolve: "{name} 進化成{stage}（第 {stage_n} 階段）！"
+  scroll_drop: "{monster} 掉下了一張轉職卷軸（{scrolls}/{scroll_max}）。"
+  scroll_full: "轉職卷軸已經帶滿了，{monster} 掉的卷軸只好留在原地。"
+  reroll: "{name} 讀了轉職卷軸，重新轉職為{class}（{style}）。"
+  reroll_same: "{name} 讀了轉職卷軸，職業仍是{class}，特化重置了，可以重新選擇。"
+  reroll_denied: "無法使用轉職卷軸：{reason}。"
