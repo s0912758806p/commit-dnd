@@ -89,10 +89,36 @@ DEVPLAN（2026-10-30）之外、實作時定下的決定。每條註明在哪一
 
     第一版每層 1 隻、成長 8% 時，第 1 天就到 B26、兩週 B169，樓層數字失去意義，因此改成上面的數值。
 
+## 已採用（迭代 4：Codex）
+
+31. **Codex 一回合＝攻擊一次＋回合**：Codex 的 notify 只在回合結束時通知，沒有個別的工具呼叫；只記 `turn` 的話，
+    寵物永遠不會出手、只會挨打。所以 `agent-turn-complete` 產生兩個事件：先 `tool_use`（`Tool: "Codex"`），再 `turn`，
+    並把 `Codex` 加進 `balance.yaml` 的 `dungeon.attack_tools`。順序跟 Claude Code 一樣是「先出手、回合結束才輪到怪物」。
+    Claude 一個回合通常有好幾次 Edit，Codex 固定一次，所以同樣回合數下 Codex 打得比較慢；第 30 條的模擬是以
+    Claude「每回合 2 次編輯」做的，Codex 玩家的節奏還沒有模擬，實際玩過再調。`attack_tools` 不分來源，
+    Claude 若有一個工具剛好叫 `Codex` 也會算攻擊（目前沒有）。
+32. **notify 的介面**（2026-11-04 查證官方文件與原始碼 `codex-rs/hooks/src/legacy_notify.rs`）：設定在
+    `$CODEX_HOME/config.toml`（預設 `~/.codex`）最上層的 `notify`，是「程式＋參數」的字串陣列；Codex 把 JSON 附在
+    **最後一個參數**，stdin／stdout／stderr 都是空的，只啟動、不等結束也不看 exit code。payload 欄位是 kebab-case：
+    `type`（目前只有 `agent-turn-complete`）、`thread-id`、`turn-id`、`cwd`、`client`（選填）、`input-messages`、
+    `last-assistant-message`。adapter 只讀 `type` 與 `cwd`（取資料夾名），缺 `cwd` 不產生事件；對話內容一律不保存。
+    原始碼把 notify 標成 legacy，見「待決」。
+33. **串接原本的 notify**：已有別人的 notify 時，原本的陣列與 TOML 原文存到 `$DND_HOME/codex/original-notify.json`，
+    `notify` 換成 dnd。`dnd hook codex` 先寫自己的事件，再用同樣的參數（含 payload）啟動原本的 notify，
+    跟 Codex 一樣不等它結束；兩段各自用 `runHook` 吞錯並寫 errors.log，任一邊失敗都不影響另一邊。
+    `hook codex` 關掉 Cobra 的旗標解析，參數原樣轉交。uninstall 先試著還原原文（含註解、多行），原文解析結果對不上時才用陣列重寫。
+34. **保留原文的 TOML 編輯**：用 `github.com/BurntSushi/toml` v1.6.0（2025-12 發布、仍在維護、無其他依賴）完整解析，
+    但它不能保留原文寫回，所以自己寫一個只掃最上層 `key = value` 位置的掃描器，只替換 `notify` 的值、插入或刪除那一行。
+    寫入前再解析一次，確認 notify 以外的資料完全相同（`verifyCodexEdit`），掃描器出錯時寧可報錯也不寫檔；
+    `FuzzCodexInstall` 守住「合法 TOML 一定改得動，install → uninstall 回到原檔」。新增那一行時不額外加空行，
+    uninstall 才能逐 byte 還原。寫入流程（diff、確認、備份、原子寫入）沿用 `ClaudePlan`，以型別別名 `ConfigPlan` 共用。
+
 ## 待決
 
 - **statusline 唯讀**（迭代 2）：不取鎖、不寫檔；使用者已有 statusLine 時，`install claude` 用 chain 包裝。
 - **未定義的規則**：紮營、`commit_mix`、迭代 6 的「待決事項」都沒有設計文件，邊做邊定，定了就記在上面「已採用」。
 - **既有寵物的 `commit_mix`**（迭代 5）：迭代 1 就孵蛋，迭代 5 才建 `commit_mix`，需要對已孵的寵物補算一次。
 - **拿不到鎖時事件遺失**：hook 等鎖超過 50 ms 會放棄並寫 errors.log，那一筆 commit 不計分。實際玩一陣子看 errors.log 是否出現，再決定要不要加暫存佇列。
+- **Codex notify 是 legacy**（迭代 4）：Codex 原始碼把 notify 標成為了相容而保留，並註記之後要移除；
+  新的 hooks 機制（stdin、snake_case 欄位）文件上沒有提到 notify。notify 被移除時，要改成 hooks 版的 adapter 與 installer。
 - **`dnd debug` 指令**：`debug time`、`debug xp` 等（DEVPLAN「自我測試」一節）尚未實作，目前只有 `debug rebuild`。
