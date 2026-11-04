@@ -3,7 +3,7 @@ package engine
 import "time"
 
 // StateVersion 是 state.json 的格式版本。state.json 只是快取，版本不符時 store 會從 events.jsonl 重建。
-const StateVersion = 4
+const StateVersion = 5
 
 // State 是遊戲的完整狀態。所有數值一律用整數，確保 JSON 往返與跨平台重播結果完全相同。
 // State 必須保持可比較（不含 map／slice），測試直接用 == 比對。
@@ -13,9 +13,53 @@ type State struct {
 	UpdatedAt   time.Time `json:"updated_at"` // 只會前進，不會因時間倒流的事件而後退
 	ContentHash string    `json:"content_hash"`
 	// LastCommit 是最後一筆計分的 commit hash；同一個 hash 再來（hook 重跑、重複安裝）不重複計分。
-	LastCommit string `json:"last_commit"`
-	Pet        Pet    `json:"pet"`
-	AI         AI     `json:"ai"`
+	LastCommit string  `json:"last_commit"`
+	Pet        Pet     `json:"pet"`
+	AI         AI      `json:"ai"`
+	Dungeon    Dungeon `json:"dungeon"`
+}
+
+// BagSize 是未鑑定掉落物的背包容量；滿了之後新的掉落物會被丟掉。
+const BagSize = 10
+
+// Dungeon 是無盡地下城的進度。
+type Dungeon struct {
+	Floor   int     `json:"floor"`   // 目前樓層；0 表示還在入口
+	Deepest int     `json:"deepest"` // 到過最深的樓層
+	Warp    int     `json:"warp"`    // 已解鎖最深的傳送點（打倒過 Boss 的樓層）；0 表示沒有
+	Downed  bool    `json:"downed"`  // 倒地中：AI 回合不再推進，等 commit 救援
+	Monster Monster `json:"monster"` // 眼前的怪物；ID 為空表示沒有（下個 AI 回合遇到下一隻或往下探）
+	Cleared int     `json:"cleared"` // 這層已打倒幾隻；滿 encounters_per_floor（或打倒 Boss）才往下探
+	Weapon  Item    `json:"weapon"`  // 裝備中的武器；Name 為空表示沒有
+	Armor   Item    `json:"armor"`
+	// Bag 是未鑑定的掉落物，前 BagN 個有效（舊到新）。commit 鑑定最舊的一件；倒地時全部遺失。
+	Bag   [BagSize]Drop `json:"bag"`
+	BagN  int           `json:"bag_n"`
+	Kills int           `json:"kills"`
+	Downs int           `json:"downs"`
+	// LastActive 是最後一次 commit 或 AI 活動的時間；之後閒置超過 camp_after_hours 就紮營回滿 HP。
+	LastActive time.Time `json:"last_active"`
+}
+
+type Monster struct {
+	ID    string `json:"id"` // content.Monster 的 id；名稱、屬性、是否 Boss 查內容
+	HP    int    `json:"hp"`
+	MaxHP int    `json:"max_hp"`
+	Atk   int    `json:"atk"`
+}
+
+// Item 是鑑定後的裝備。Kind 為 "weapon" 或 "armor"。
+type Item struct {
+	Kind    string `json:"kind"`
+	Name    string `json:"name"`
+	Element string `json:"element"`
+	Power   int    `json:"power"`
+}
+
+// Drop 是未鑑定的掉落物：鑑定時用 Seed 決定種類、屬性、名稱與強度，重播結果不變。
+type Drop struct {
+	Floor int    `json:"floor"`
+	Seed  uint64 `json:"seed"`
 }
 
 // AI 是 Claude Code／Codex 的活動統計。迭代 2 只計數；迭代 3 起 AI 回合會推進地下城。
@@ -75,4 +119,10 @@ const (
 	EffectLevelUp Effect = "levelup"
 	EffectHungry  Effect = "hungry"
 	EffectSupply  Effect = "supply"
+	EffectDescend Effect = "descend"
+	EffectKill    Effect = "kill"
+	EffectBoss    Effect = "boss"
+	EffectDowned  Effect = "downed"
+	EffectRescue  Effect = "rescue"
+	EffectCamp    Effect = "camp"
 )

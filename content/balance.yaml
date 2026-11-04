@@ -51,3 +51,19 @@ mood:
   per_pet: 50
   decay_every_minutes: 60
   decay_amount: 10
+
+dungeon:
+  growth_per_floor_pct: 10     # 怪物 HP、攻擊每往下一層 +10%（線性，第 1 層為 100%）
+  encounters_per_floor: 6      # 每層要打倒 6 隻怪物才往下探（Boss 層只有 Boss 一隻）
+  boss_every: 10               # 每 10 層一隻 Boss，打倒後解鎖該層傳送點
+  boss_multiplier_pct: 200     # Boss 的 HP、攻擊再乘 200%
+  element_advantage_pct: 150   # 屬性相剋時傷害 ×1.5
+  element_disadvantage_pct: 70 # 被剋時傷害 ×0.7
+  pet_atk_base: 5              # 寵物攻擊 = 5 + 2 × 等級 + 武器強度
+  pet_atk_per_level: 2
+  pet_def_per_level: 1         # 寵物防禦 = 1 × 等級 + 防具強度；受到傷害 = max(1, 怪物攻擊 − 防禦)
+  rescue_hp_pct: 50            # 倒地後被 commit 救起時，HP 回到上限的 50%
+  camp_after_hours: 8          # 沒有任何 commit／AI 活動超過 8 小時就紮營，HP 回滿（倒地中不會復活）
+  item_power_base: 1           # 裝備強度 = 1 + 掉落樓層 ÷ 5 + 0～2 的隨機
+  item_power_per_floors: 5
+  attack_tools: [Edit, Write, MultiEdit, NotebookEdit]  # 這些工具呼叫一次 = 寵物攻擊一次

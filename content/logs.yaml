@@ -1,5 +1,7 @@
 # 冒險日誌模板。可用的佔位符：{name} 寵物名、{species} 物種名、{xp} 獲得經驗、
 # {lines} 改動行數、{level} 等級。同一類有多句時，用 commit hash 決定挑哪一句（重播結果不變）。
+# dungeon 區塊另有：{floor} 樓層、{monster} 怪物名、{element} 屬性、{item} 裝備、
+# {bag}／{bag_max} 背包數量、{lost} 遺失件數、{reason} 原因。
 
 hatch: "蛋裂開了，{species}「{name}」誕生了！"
 already_hatched: "已經有 {name} 了，蛋放回了倉庫。"
@@ -29,3 +31,20 @@ commit:
   other:
     - "{name} 搬動了 {lines} 塊石頭，獲得 {xp} XP。"
     - "{name} 在營火旁整理裝備，獲得 {xp} XP。"
+
+dungeon:
+  descend: "{name} 下探到 B{floor}，遇到了 {monster}（{element}）。"
+  encounter: "{name} 在 B{floor} 又遇到了 {monster}（{element}）。"
+  boss: "{name} 來到 B{floor}，Boss {monster}（{element}）擋住了去路！"
+  kill: "{name} 打倒了 {monster}。"
+  boss_kill: "{name} 打倒了 Boss {monster}，B{floor} 的傳送點解鎖了！"
+  drop: "{monster} 掉了一件未鑑定的裝備（背包 {bag}/{bag_max}）。"
+  bag_full: "背包滿了，{monster} 掉的裝備只好留在原地。"
+  downed: "{name} 在 B{floor} 被 {monster} 打倒了，{lost} 件未鑑定的裝備散落一地……"
+  rescue: "commit 的光照進地城，{name} 在 B{floor} 重新站了起來！"
+  identify_equip: "鑑定出 {item}，{name} 換上了它。"
+  identify_skip: "鑑定出 {item}，比不上身上的裝備，拿去換了補給。"
+  camp: "{name} 紮營睡了一覺，HP 回滿了。"
+  warp: "{name} 透過傳送點來到 B{floor}。"
+  warp_entrance: "{name} 回到了地城入口。"
+  warp_denied: "無法傳送到 B{floor}：{reason}。"

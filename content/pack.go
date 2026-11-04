@@ -1,6 +1,7 @@
 // Package content 載入嵌入在執行檔裡的 YAML 遊戲內容（content.Pack）。
 //
-// balance.yaml（數值）、species.yaml（物種）、logs.yaml（冒險日誌模板）
+// balance.yaml（數值）、species.yaml（物種）、logs.yaml（冒險日誌模板）、
+// monsters.yaml／floors.yaml／items.yaml（地下城）
 // 以 go:embed 編進執行檔，所以調整內容只要重新編譯。XP 曲線在載入時預先算成整數表，
 // 引擎與 State 內不出現浮點。Pack.Hash 是三個檔案的雜湊，引擎把它寫進 State.ContentHash，
 // 用來偵測「用不同內容重播」造成的差異。測試可以直接組一個 &Pack{...} 注入，不必經過 YAML。
@@ -26,17 +27,26 @@ var (
 	speciesYAML []byte
 	//go:embed logs.yaml
 	logsYAML []byte
+	//go:embed monsters.yaml
+	monstersYAML []byte
+	//go:embed floors.yaml
+	floorsYAML []byte
+	//go:embed items.yaml
+	itemsYAML []byte
 )
 
 // Files 是 Pack 的原始 YAML；Parse 的輸入。
 type Files struct {
-	Balance, Species, Logs []byte
+	Balance, Species, Logs, Monsters, Floors, Items []byte
 }
 
 type Pack struct {
-	Balance Balance
-	Species []Species
-	Logs    Logs
+	Balance  Balance
+	Species  []Species
+	Logs     Logs
+	Monsters []Monster
+	Floors   Floors
+	Items    Items
 	// XPTable[n] 是從 Lv n 升到 n+1 需要的 XP；索引 0 不使用，長度為 max_level。
 	XPTable []int
 	Hash    string // sha256 前 12 碼
@@ -49,6 +59,56 @@ type Balance struct {
 	HP      HP      `yaml:"hp"`
 	Satiety Satiety `yaml:"satiety"`
 	Mood    Mood    `yaml:"mood"`
+	Dungeon Dungeon `yaml:"dungeon"`
+}
+
+type Dungeon struct {
+	GrowthPerFloorPct      int      `yaml:"growth_per_floor_pct"`
+	EncountersPerFloor     int      `yaml:"encounters_per_floor"`
+	BossEvery              int      `yaml:"boss_every"`
+	BossMultiplierPct      int      `yaml:"boss_multiplier_pct"`
+	ElementAdvantagePct    int      `yaml:"element_advantage_pct"`
+	ElementDisadvantagePct int      `yaml:"element_disadvantage_pct"`
+	PetAtkBase             int      `yaml:"pet_atk_base"`
+	PetAtkPerLevel         int      `yaml:"pet_atk_per_level"`
+	PetDefPerLevel         int      `yaml:"pet_def_per_level"`
+	RescueHPPct            int      `yaml:"rescue_hp_pct"`
+	CampAfterHours         int      `yaml:"camp_after_hours"`
+	ItemPowerBase          int      `yaml:"item_power_base"`
+	ItemPowerPerFloors     int      `yaml:"item_power_per_floors"`
+	AttackTools            []string `yaml:"attack_tools"`
+}
+
+// Elements 是三種屬性；Beats[a] 是 a 剋制的屬性（火剋草、草剋水、水剋火）。
+var (
+	Elements = []string{"fire", "water", "grass"}
+	Beats    = map[string]string{"fire": "grass", "grass": "water", "water": "fire"}
+)
+
+// ElementName 是屬性的中文名稱。
+var ElementName = map[string]string{"fire": "火", "water": "水", "grass": "草"}
+
+type Monster struct {
+	ID      string `yaml:"id"`
+	Name    string `yaml:"name"`
+	Element string `yaml:"element"`
+	HP      int    `yaml:"hp"`
+	Atk     int    `yaml:"atk"`
+	Boss    bool   `yaml:"boss"`
+}
+
+type Floors struct {
+	Tiers []struct {
+		From     int      `yaml:"from"`
+		Monsters []string `yaml:"monsters"`
+	} `yaml:"tiers"`
+	Bosses []string `yaml:"bosses"`
+}
+
+// Items 是裝備名稱：Weapon／Armor[屬性] = 名稱清單。
+type Items struct {
+	Weapon map[string][]string `yaml:"weapon"`
+	Armor  map[string][]string `yaml:"armor"`
 }
 
 type XP struct {
@@ -110,6 +170,25 @@ type Logs struct {
 	Pet            string              `yaml:"pet"`
 	NoPet          string              `yaml:"no_pet"`
 	Commit         map[string][]string `yaml:"commit"` // 依 commit 類型；必須有 other
+	Dungeon        DungeonLogs         `yaml:"dungeon"`
+}
+
+type DungeonLogs struct {
+	Descend       string `yaml:"descend"`
+	Encounter     string `yaml:"encounter"`
+	Boss          string `yaml:"boss"`
+	Kill          string `yaml:"kill"`
+	BossKill      string `yaml:"boss_kill"`
+	Drop          string `yaml:"drop"`
+	BagFull       string `yaml:"bag_full"`
+	Downed        string `yaml:"downed"`
+	Rescue        string `yaml:"rescue"`
+	IdentifyEquip string `yaml:"identify_equip"`
+	IdentifySkip  string `yaml:"identify_skip"`
+	Camp          string `yaml:"camp"`
+	Warp          string `yaml:"warp"`
+	WarpEntrance  string `yaml:"warp_entrance"`
+	WarpDenied    string `yaml:"warp_denied"`
 }
 
 // Parse 解析並驗證內容；未知欄位視為錯誤，避免打錯字默默失效。
@@ -123,6 +202,9 @@ func Parse(f Files) (*Pack, error) {
 		{"balance.yaml", f.Balance, &p.Balance},
 		{"species.yaml", f.Species, &p.Species},
 		{"logs.yaml", f.Logs, &p.Logs},
+		{"monsters.yaml", f.Monsters, &p.Monsters},
+		{"floors.yaml", f.Floors, &p.Floors},
+		{"items.yaml", f.Items, &p.Items},
 	} {
 		dec := yaml.NewDecoder(bytes.NewReader(d.src))
 		dec.KnownFields(true)
@@ -137,7 +219,7 @@ func Parse(f Files) (*Pack, error) {
 	p.XPTable = XPTable(x.CurveBase, x.CurveExp, x.MaxLevel)
 
 	h := sha256.New()
-	for _, b := range [][]byte{f.Balance, f.Species, f.Logs} {
+	for _, b := range [][]byte{f.Balance, f.Species, f.Logs, f.Monsters, f.Floors, f.Items} {
 		h.Write(b)
 		h.Write([]byte{0})
 	}
@@ -188,8 +270,19 @@ func (p *Pack) validate() error {
 		}
 	}
 
+	if err := p.validateDungeon(); err != nil {
+		return err
+	}
+
 	if len(p.Logs.Commit["other"]) == 0 {
 		return fmt.Errorf("logs.yaml: commit 必須有 other")
+	}
+	dl := p.Logs.Dungeon
+	for _, s := range []string{dl.Descend, dl.Encounter, dl.Boss, dl.Kill, dl.BossKill, dl.Drop, dl.BagFull, dl.Downed, dl.Rescue,
+		dl.IdentifyEquip, dl.IdentifySkip, dl.Camp, dl.Warp, dl.WarpEntrance, dl.WarpDenied} {
+		if s == "" {
+			return fmt.Errorf("logs.yaml: dungeon 的每一句都要有內容")
+		}
 	}
 	for kind, lines := range p.Logs.Commit {
 		if len(lines) == 0 {
@@ -223,7 +316,7 @@ func (p *Pack) MaxHP(level int) int {
 }
 
 var defaultPack = sync.OnceValues(func() (*Pack, error) {
-	return Parse(Files{Balance: balanceYAML, Species: speciesYAML, Logs: logsYAML})
+	return Parse(Embedded())
 })
 
 // Default 回傳嵌入的正式內容；只解析一次。
@@ -231,5 +324,87 @@ func Default() (*Pack, error) { return defaultPack() }
 
 // Embedded 回傳嵌入的原始 YAML，給測試改寫其中一個檔案用。
 func Embedded() Files {
-	return Files{Balance: balanceYAML, Species: speciesYAML, Logs: logsYAML}
+	return Files{Balance: balanceYAML, Species: speciesYAML, Logs: logsYAML, Monsters: monstersYAML, Floors: floorsYAML, Items: itemsYAML}
+}
+
+func (p *Pack) validateDungeon() error {
+	d := p.Balance.Dungeon
+	if d.BossEvery < 1 || d.EncountersPerFloor < 1 || d.GrowthPerFloorPct < 0 || d.BossMultiplierPct < 100 || d.RescueHPPct < 1 || d.RescueHPPct > 100 ||
+		d.CampAfterHours < 1 || d.ItemPowerPerFloors < 1 || d.ElementAdvantagePct < 100 || d.ElementDisadvantagePct < 1 {
+		return fmt.Errorf("balance.yaml: dungeon 的數值超出範圍")
+	}
+	seen := map[string]bool{}
+	for _, m := range p.Monsters {
+		if m.ID == "" || m.Name == "" || seen[m.ID] || Beats[m.Element] == "" || m.HP < 1 || m.Atk < 1 {
+			return fmt.Errorf("monsters.yaml: %q 的 id／name／element／hp／atk 不正確或 id 重複", m.ID)
+		}
+		seen[m.ID] = true
+	}
+	need := func(ids []string, boss bool, where string) error {
+		if len(ids) == 0 {
+			return fmt.Errorf("floors.yaml: %s 不可為空", where)
+		}
+		for _, id := range ids {
+			m, ok := p.MonsterByID(id)
+			if !ok || m.Boss != boss {
+				return fmt.Errorf("floors.yaml: %s 的 %q 不存在或 boss 標記不符", where, id)
+			}
+		}
+		return nil
+	}
+	if len(p.Floors.Tiers) == 0 || p.Floors.Tiers[0].From != 1 {
+		return fmt.Errorf("floors.yaml: tiers 必須從 from: 1 開始")
+	}
+	for i, t := range p.Floors.Tiers {
+		if i > 0 && t.From <= p.Floors.Tiers[i-1].From {
+			return fmt.Errorf("floors.yaml: tiers 的 from 必須遞增")
+		}
+		if err := need(t.Monsters, false, fmt.Sprintf("tiers[%d]", i)); err != nil {
+			return err
+		}
+	}
+	if err := need(p.Floors.Bosses, true, "bosses"); err != nil {
+		return err
+	}
+	for _, e := range Elements {
+		if len(p.Items.Weapon[e]) == 0 || len(p.Items.Armor[e]) == 0 {
+			return fmt.Errorf("items.yaml: weapon 與 armor 都要有 %s 屬性的名稱", e)
+		}
+	}
+	return nil
+}
+
+// MonsterByID 找出怪物；找不到回傳 false。
+func (p *Pack) MonsterByID(id string) (Monster, bool) {
+	for _, m := range p.Monsters {
+		if m.ID == id {
+			return m, true
+		}
+	}
+	return Monster{}, false
+}
+
+// TierMonsters 回傳某層可能出現的一般怪物 id。
+func (p *Pack) TierMonsters(floor int) []string {
+	ids := p.Floors.Tiers[0].Monsters
+	for _, t := range p.Floors.Tiers {
+		if t.From <= floor {
+			ids = t.Monsters
+		}
+	}
+	return ids
+}
+
+// BossFor 回傳 Boss 層的 Boss id；不是 Boss 層時回傳空字串。
+func (p *Pack) BossFor(floor int) string {
+	every := p.Balance.Dungeon.BossEvery
+	if floor < every || floor%every != 0 {
+		return ""
+	}
+	return p.Floors.Bosses[(floor/every-1)%len(p.Floors.Bosses)]
+}
+
+// IsAttackTool 回報這個工具呼叫是否算寵物攻擊一次。
+func (p *Pack) IsAttackTool(tool string) bool {
+	return slices.Contains(p.Balance.Dungeon.AttackTools, tool)
 }

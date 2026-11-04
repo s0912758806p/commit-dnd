@@ -8,11 +8,16 @@
 //   - commit：依類型與行數給 XP；當地每天前幾筆乘上補給倍率，飽足過低減半；同時餵食、回血、升級。
 //     與上一筆計分的 commit 同 hash 時不計分（hook 重跑、重複安裝）
 //   - pet：心情上升
-//   - turn／tool_use：只計數 AI 回合與工具呼叫（迭代 3 起推進地下城）；孵蛋前也計數
+//   - turn／tool_use：計數 AI 回合與工具呼叫（孵蛋前也計數）；孵蛋後推進地下城（見 dungeon.go）
+//   - warp：使用者的傳送指令（見 dungeon.go）
 //   - 其他類型（含 tick）：只推進時間
 //
-// 時間效果（飽足、心情下降，HP 回復）必須「路徑無關」：一次推進 Δ1+Δ2 與分兩次結果相同
-// （見 TestTimeEffectsArePathIndependent），因為 status 套用的 tick 不會寫入 events.jsonl。
+// commit 會先救起倒地的寵物、最後鑑定一件未鑑定裝備。commit、turn、tool_use 算「活動」，
+// 會更新 Dungeon.LastActive。
+//
+// 時間效果（飽足、心情下降，HP 回復，閒置滿 camp_after_hours 紮營回滿）必須「路徑無關」：
+// 一次推進 Δ1+Δ2 與分兩次結果相同（見 TestTimeEffectsArePathIndependent），
+// 因為 status 套用的 tick 不會寫入 events.jsonl。倒地中 HP 不會自然回復，也不會紮營。
 package engine
 
 import (
@@ -47,12 +52,16 @@ func (r *Result) log(at time.Time, c *content.Pack, tmpl string, vars map[string
 func Apply(s State, e event.Event, c *content.Pack) Result {
 	s.V = StateVersion
 	s.ContentHash = c.Hash
-	s = advance(s, e.At, c)
+	s, camped := advance(s, e.At, c)
 	if e.Seq > s.LastSeq {
 		s.LastSeq = e.Seq
 	}
 
 	r := Result{State: s}
+	if camped {
+		r.dlog(e.At, c, c.Logs.Dungeon.Camp, nil)
+		r.Fx = append(r.Fx, EffectCamp)
+	}
 	switch e.Type {
 	case "hatch":
 		hatch(&r, e, c)
@@ -67,14 +76,33 @@ func Apply(s State, e event.Event, c *content.Pack) Result {
 		}
 		ai.Turns++
 		ai.TodayTurns++
+		if r.State.Pet.Hatched() {
+			dungeonTurn(&r, e, c)
+		}
 	case "tool_use":
 		r.State.AI.ToolUses++
+		if r.State.Pet.Hatched() {
+			attack(&r, e, c)
+		}
+	case "warp":
+		if r.State.Pet.Hatched() {
+			warp(&r, e, c)
+		} else {
+			r.log(e.At, c, c.Logs.NoPet, nil)
+		}
+	}
+	switch e.Type {
+	case "commit", "turn", "tool_use":
+		if d := &r.State.Dungeon; e.At.After(d.LastActive) {
+			d.LastActive = e.At
+		}
 	}
 	return r
 }
 
 // advance 推進時間效果。未滿一個週期的時間留在各自的 Carry，所以切分方式不影響結果。
-func advance(s State, at time.Time, c *content.Pack) State {
+// camped 表示這次推進觸發了紮營（HP 回滿）。
+func advance(s State, at time.Time, c *content.Pack) (_ State, camped bool) {
 	var elapsed time.Duration
 	if !s.UpdatedAt.IsZero() && at.After(s.UpdatedAt) {
 		elapsed = at.Sub(s.UpdatedAt)
@@ -84,7 +112,7 @@ func advance(s State, at time.Time, c *content.Pack) State {
 	}
 	p := &s.Pet
 	if !p.Hatched() {
-		return s
+		return s, false
 	}
 
 	b := c.Balance
@@ -93,8 +121,18 @@ func advance(s State, at time.Time, c *content.Pack) State {
 	n = periods(&p.MoodCarry, elapsed, b.Mood.DecayEveryMinutes)
 	p.Mood = drain(p.Mood, n, b.Mood.DecayAmount)
 	n = periods(&p.HPCarry, elapsed, b.HP.RegenEveryMinutes)
-	p.HP = fill(p.HP, n, b.HP.RegenAmount, c.MaxHP(p.Level))
-	return s
+	d := s.Dungeon
+	if d.Downed {
+		return s, false
+	}
+	maxHP := c.MaxHP(p.Level)
+	p.HP = fill(p.HP, n, b.HP.RegenAmount, maxHP)
+	idle := time.Duration(b.Dungeon.CampAfterHours) * time.Hour
+	if !d.LastActive.IsZero() && at.Sub(d.LastActive) >= idle && p.HP < maxHP {
+		p.HP = maxHP
+		return s, true
+	}
+	return s, false
 }
 
 // periods 把 elapsed 加進 carry，回傳滿了幾個週期，餘數留在 carry。
@@ -153,6 +191,7 @@ func commit(r *Result, e event.Event, c *content.Pack) {
 		return
 	}
 	r.State.LastCommit = e.Commit.Hash
+	rescue(r, e, c)
 	b := c.Balance
 	ci := e.Commit
 	kind := ci.Kind
@@ -196,6 +235,7 @@ func commit(r *Result, e event.Event, c *content.Pack) {
 		r.log(e.At, c, c.Logs.Levelup, nil)
 		r.Fx = append(r.Fx, EffectLevelUp)
 	}
+	identifyOne(r, e, c)
 }
 
 func pet(r *Result, e event.Event, c *content.Pack) {
