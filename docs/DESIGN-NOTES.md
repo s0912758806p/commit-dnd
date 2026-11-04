@@ -50,6 +50,20 @@ DEVPLAN（2026-10-30）之外、實作時定下的決定。每條註明在哪一
     - 舊的 `knight`（人類騎士）設為人族的 alias，正式遊玩中的 GR騎士因此成為人族；「騎士」留給之後的職業系統。
     - slime、drake、owl 沒有正式存檔用過，直接移除。
 
+## 已採用（迭代 2）
+
+21. **AI 活動只計數**：Claude Code 的 Stop → `turn`、PostToolUse → `tool_use`，記在 `State.AI`（累計回合、工具呼叫、當天回合），
+    不改變寵物，也不產生冒險日誌（工具呼叫太頻繁）。地下城在迭代 3 才接上。`StateVersion` 升為 4。
+22. **hook 用 async、永遠 exit 0**：官方文件（2026-11-04 查證）指出 Stop hook 若 exit 2 會讓 Claude 停不下來，
+    所以 `dnd hook claude` 對任何輸入都安靜成功（`TestHookClaude` 守住）；安裝時設 `"async": true`，不阻塞 Claude。
+23. **不保存 AI 的內容**：事件只留 hook 名稱、工具名稱、repo 資料夾名；`tool_input`、`tool_response`、`session_id`、
+    `transcript_path` 都不寫進 events.jsonl。測試樣本也去識別化後才放進 repo。
+24. **statusline 串接而不取代**：使用者原本的 statusLine 存到 `$DND_HOME/claude/original-statusline.json`，
+    `dnd statusline` 先執行它（同一份 stdin、1 秒上限）再接上寵物資訊；uninstall 時還原。statusline 永遠 exit 0，
+    因為 Claude Code 只顯示 exit 0 的輸出。
+25. **AI 事件量**：每次工具呼叫都寫一行事件，一天幾百行。`dnd status`／`statusline` 只讀 state.json 不受影響；
+    `dnd log` 每次全量重播，若一年後變慢，再考慮定期快照。
+
 ## 待決
 
 - **statusline 唯讀**（迭代 2）：不取鎖、不寫檔；使用者已有 statusLine 時，`install claude` 用 chain 包裝。

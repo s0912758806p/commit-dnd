@@ -278,3 +278,21 @@ func TestApplyIsDeterministic(t *testing.T) {
 		t.Fatalf("%+v != %+v", a.State, b.State)
 	}
 }
+
+func TestAICounts(t *testing.T) {
+	turn := func(at time.Time) event.Event { e := ev("turn", at); e.Source = event.SourceClaude; return e }
+	tool := func(at time.Time) event.Event {
+		e := ev("tool_use", at)
+		e.Source, e.Tool = event.SourceClaude, "Edit"
+		return e
+	}
+	nextDay := time.Date(2026, 10, 31, 0, 10, 0, 0, cst)
+	r := run(State{}, turn(t0), tool(t0), tool(t0), turn(t0), turn(nextDay))
+	ai := r.State.AI
+	if ai.Turns != 3 || ai.ToolUses != 2 || ai.TurnsOn("2026-10-31") != 1 || ai.TurnsOn("2026-10-30") != 0 || len(r.Logs) != 0 {
+		t.Fatalf("%+v logs=%q", ai, texts(r))
+	}
+	if r.State.Pet != (Pet{}) {
+		t.Fatal("AI 活動不可改變寵物（不能幫牠回血或給經驗）")
+	}
+}

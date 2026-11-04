@@ -8,6 +8,7 @@
 //   - commit：依類型與行數給 XP；當地每天前幾筆乘上補給倍率，飽足過低減半；同時餵食、回血、升級。
 //     與上一筆計分的 commit 同 hash 時不計分（hook 重跑、重複安裝）
 //   - pet：心情上升
+//   - turn／tool_use：只計數 AI 回合與工具呼叫（迭代 3 起推進地下城）；孵蛋前也計數
 //   - 其他類型（含 tick）：只推進時間
 //
 // 時間效果（飽足、心情下降，HP 回復）必須「路徑無關」：一次推進 Δ1+Δ2 與分兩次結果相同
@@ -59,6 +60,15 @@ func Apply(s State, e event.Event, c *content.Pack) Result {
 		commit(&r, e, c)
 	case "pet":
 		pet(&r, e, c)
+	case "turn":
+		ai := &r.State.AI
+		if day := e.At.Format(time.DateOnly); day != ai.Day {
+			ai.Day, ai.TodayTurns = day, 0
+		}
+		ai.Turns++
+		ai.TodayTurns++
+	case "tool_use":
+		r.State.AI.ToolUses++
 	}
 	return r
 }

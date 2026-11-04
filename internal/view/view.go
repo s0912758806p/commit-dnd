@@ -42,13 +42,8 @@ func Status(s engine.State, c *content.Pack, now time.Time) string {
 	row("飽足", "%d/%d", p.Satiety, c.Balance.Satiety.Max)
 	row("心情", "%d/%d", p.Mood, c.Balance.Mood.Max)
 
-	sup := c.Balance.Supply
-	left := sup.CommitsPerDay
-	if p.SupplyDay == now.Format(time.DateOnly) {
-		left = max(0, left-p.SupplyUsed)
-	}
-	if left > 0 {
-		row("補給", "今天還剩 %d 次（XP ×%d）", left, sup.Multiplier)
+	if left := supplyLeft(p, c, now.Format(time.DateOnly)); left > 0 {
+		row("補給", "今天還剩 %d 次（XP ×%d）", left, c.Balance.Supply.Multiplier)
 	} else {
 		row("補給", "今天已用完")
 	}
@@ -56,6 +51,38 @@ func Status(s engine.State, c *content.Pack, now time.Time) string {
 		row("狀態", "肚子餓了，commit 的 XP 減半")
 	}
 	return b.String()
+}
+
+// Statusline 是 `dnd statusline` 的輸出：Claude Code 底部的一行，沒有換行。
+func Statusline(s engine.State, c *content.Pack, now time.Time) string {
+	p := s.Pet
+	if !p.Hatched() {
+		return "dnd：還沒有寵物（dnd hatch）"
+	}
+	parts := []string{fmt.Sprintf("%s Lv %d", p.Name, p.Level)}
+	if cost := c.Cost(p.Level); cost > 0 {
+		parts = append(parts, fmt.Sprintf("XP %d/%d", p.XP, cost))
+	}
+	parts = append(parts, fmt.Sprintf("HP %d/%d", p.HP, c.MaxHP(p.Level)))
+	satiety := fmt.Sprintf("飽足 %d", p.Satiety)
+	if p.Satiety < c.Balance.Satiety.HungryBelow {
+		satiety += "（餓）"
+	}
+	parts = append(parts, satiety)
+	today := now.Format(time.DateOnly)
+	if left := supplyLeft(p, c, today); left > 0 {
+		parts = append(parts, fmt.Sprintf("補給 %d", left))
+	}
+	parts = append(parts, fmt.Sprintf("今日 AI 回合 %d", s.AI.TurnsOn(today)))
+	return strings.Join(parts, " · ")
+}
+
+func supplyLeft(p engine.Pet, c *content.Pack, today string) int {
+	left := c.Balance.Supply.CommitsPerDay
+	if p.SupplyDay == today {
+		left = max(0, left-p.SupplyUsed)
+	}
+	return left
 }
 
 // Log 是 `dnd log` 的輸出：每行「月/日 時:分  日誌」，時間用事件發生時的時區。

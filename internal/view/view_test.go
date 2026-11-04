@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,4 +75,28 @@ func TestLog(t *testing.T) {
 	}
 	golden(t, "log.txt", Log(lines))
 	golden(t, "log_empty.txt", Log(nil))
+}
+
+func TestStatusline(t *testing.T) {
+	c, err := content.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pet := engine.Pet{Species: "human", Name: "GR騎士", Stage: 1, Level: 4, XP: 99, HP: 35, Satiety: 1000, SupplyDay: "2026-10-30", SupplyUsed: 3}
+	ai := engine.AI{Turns: 40, Day: "2026-10-30", TodayTurns: 12}
+	hungry := pet
+	hungry.Satiety, hungry.SupplyDay = 120, "2026-10-29"
+	var got []string
+	for _, s := range []engine.State{
+		{Pet: pet, AI: ai},
+		{Pet: hungry, AI: engine.AI{Day: "2026-10-29", TodayTurns: 5}}, // 昨天的回合不算今天
+		{},
+	} {
+		line := Statusline(s, c, now)
+		if strings.Contains(line, "\n") {
+			t.Fatalf("statusline 不可換行: %q", line)
+		}
+		got = append(got, line)
+	}
+	golden(t, "statusline.txt", strings.Join(got, "\n")+"\n")
 }
