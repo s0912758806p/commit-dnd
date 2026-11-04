@@ -87,7 +87,7 @@ func TestDungeon(t *testing.T) {
 	}
 	pet := engine.Pet{Species: "human", Name: "小橘", Stage: 1, Level: 6, HP: 30, Satiety: 800, Mood: 600}
 	explore := engine.Dungeon{
-		Floor: 12, Deepest: 15, Warp: 10, Kills: 23, Downs: 1,
+		Floor: 12, Deepest: 15, Warp: 10, Kills: 23, Downs: 1, Cleared: 2,
 		Monster: engine.Monster{ID: "spaghetti", HP: 19, MaxHP: 41, Atk: 7},
 	}
 	cases := map[string]engine.Dungeon{
@@ -100,7 +100,12 @@ func TestDungeon(t *testing.T) {
 			d.Monster = engine.Monster{ID: c.BossFor(20), HP: 120, MaxHP: 120, Atk: 18}
 			return d
 		}(),
-		"dungeon_cleared.txt": func() engine.Dungeon { d := explore; d.Monster = engine.Monster{}; return d }(),
+		"dungeon_between.txt": func() engine.Dungeon { d := explore; d.Monster = engine.Monster{}; return d }(), // 這層還沒打完
+		"dungeon_cleared.txt": func() engine.Dungeon {
+			d := explore
+			d.Monster, d.Cleared = engine.Monster{}, c.Balance.Dungeon.EncountersPerFloor
+			return d
+		}(),
 		"dungeon_downed.txt": func() engine.Dungeon {
 			d := explore
 			d.Floor, d.Downed, d.Downs = 15, true, 2

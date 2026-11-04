@@ -102,7 +102,7 @@ func dungeonTurn(r *Result, e event.Event, c *content.Pack) {
 func spawn(r *Result, e event.Event, c *content.Pack) {
 	d := &r.State.Dungeon
 	g := c.Balance.Dungeon
-	newFloor := d.Floor == 0 || d.Cleared >= g.EncountersPerFloor
+	newFloor := FloorCleared(r.State, c)
 	if newFloor {
 		d.Floor++
 		d.Cleared = 0

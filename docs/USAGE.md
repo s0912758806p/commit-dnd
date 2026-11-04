@@ -49,7 +49,9 @@ dnd log              # 冒險日誌
 | `dnd hatch [--species id] [--name 名字]` | 孵出寵物；沒給參數時互動詢問 |
 | `dnd status` | 寵物現在的狀態（不寫檔） |
 | `dnd log [-n 20]` | 最近的冒險日誌（`-n 0` 顯示全部） |
-| `dnd statusline` | Claude Code 底部的一行（等級、XP、HP、飽足、補給、今日 AI 回合）；不寫檔、永遠成功 |
+| `dnd dungeon` | 地下城：樓層與這層進度、眼前的怪物、倒地狀態、攻防、裝備、未鑑定背包、戰績（不寫檔） |
+| `dnd warp <樓層>` | 傳送到入口（`0`）或已解鎖的 Boss 層（打倒過 Boss 的 B10、B20…）；倒地中不能傳送 |
+| `dnd statusline` | Claude Code 底部的一行（等級、XP、HP、飽足、補給、樓層／倒地、今日 AI 回合）；不寫檔、永遠成功 |
 | `dnd doctor [--repo .] [--settings 路徑]` | 檢查資料、寵物、hook 錯誤紀錄、git hook 與 Claude Code 設定；只讀，有問題時 exit 1 |
 | `dnd install git [--repo .]` | 在 repo 的 post-commit 加入 dnd；已有 hook 時只插入標記區塊 |
 | `dnd uninstall git [--repo .]` | 移除 dnd 區塊；檔案只剩 shebang 時整個刪除 |

@@ -117,6 +117,9 @@ func Dungeon(s engine.State, c *content.Pack) string {
 	}
 
 	var marks []string
+	if d.Floor > 0 && c.BossFor(d.Floor) == "" { // Boss 層只有 Boss 一隻，不顯示進度
+		marks = append(marks, fmt.Sprintf("已打倒 %d/%d", min(d.Cleared, c.Balance.Dungeon.EncountersPerFloor), c.Balance.Dungeon.EncountersPerFloor))
+	}
 	if d.Deepest > d.Floor {
 		marks = append(marks, "最深 "+floorName(d.Deepest))
 	}
@@ -141,8 +144,10 @@ func Dungeon(s engine.State, c *content.Pack) string {
 		row("怪物", "%s%sHP %d/%d", boss, name, d.Monster.HP, d.Monster.MaxHP)
 	case d.Floor == 0:
 		row("怪物", "還在入口，下一個 AI 回合往下探")
+	case engine.FloorCleared(s, c):
+		row("怪物", "這層打完了，下一個 AI 回合往下探")
 	default:
-		row("怪物", "這層清空了，下一個 AI 回合往下探")
+		row("怪物", "暫時沒有，下一個 AI 回合會遇到這層的下一隻")
 	}
 	if d.Downed {
 		row("狀態", "倒地中：commit 一次就能救起來（未鑑定裝備已遺失）")

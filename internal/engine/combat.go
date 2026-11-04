@@ -12,3 +12,9 @@ func PetAtk(s State, c *content.Pack) int {
 func PetDef(s State, c *content.Pack) int {
 	return c.Balance.Dungeon.PetDefPerLevel*s.Pet.Level + s.Dungeon.Armor.Power
 }
+
+// FloorCleared 回報目前這層是否已經打完：還在入口，或已打倒 encounters_per_floor 隻（打倒 Boss 也算）。
+// 打完時下一個 AI 回合會往下探，否則在同一層遇到下一隻。
+func FloorCleared(s State, c *content.Pack) bool {
+	return s.Dungeon.Floor == 0 || s.Dungeon.Cleared >= c.Balance.Dungeon.EncountersPerFloor
+}
