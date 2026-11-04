@@ -11,13 +11,16 @@ import (
 
 var now = time.Date(2026, 11, 4, 9, 0, 0, 0, time.FixedZone("CST", 8*3600))
 
-// testdata/*.json 是 Claude Code 實際送給 hook 的 stdin（個人路徑與內容已去識別化）。
+// testdata/*.json：post_tool_use_* 是 Claude Code 2.1.318 實際送給 hook 的 stdin，
+// 經去識別化（保留欄位結構，字串換成假資料，cwd 一律為 /home/user/src/commit-dnd）；
+// stop.json、session_start.json 依官方文件格式手寫。
 func TestParseSamples(t *testing.T) {
 	cases := map[string]*event.Event{
-		"post_tool_use_edit.json": {Type: "tool_use", Tool: "Edit", Repo: "commit-dnd"},
-		"post_tool_use_bash.json": {Type: "tool_use", Tool: "Bash", Repo: "commit-dnd"},
-		"stop.json":               {Type: "turn", Repo: "commit-dnd"},
-		"session_start.json":      nil,
+		"post_tool_use_edit.json":  {Type: "tool_use", Tool: "Edit", Repo: "commit-dnd"},
+		"post_tool_use_bash.json":  {Type: "tool_use", Tool: "Bash", Repo: "commit-dnd"},
+		"post_tool_use_write.json": {Type: "tool_use", Tool: "Write", Repo: "commit-dnd"},
+		"stop.json":                {Type: "turn", Repo: "commit-dnd"},
+		"session_start.json":       nil,
 	}
 	for file, want := range cases {
 		t.Run(file, func(t *testing.T) {
