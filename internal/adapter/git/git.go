@@ -1,4 +1,4 @@
-// Package git 把 post-commit 當下的 git 輸出轉成 commit 事件。
+// Package git 把 post-commit 當下的 git 輸出轉成 commit 事件；log.go 另外解析歷史 git log（dnd hatch、dnd sim）。
 //
 // 輸入是 Command 這條 git 指令的輸出：HEAD 最新一筆 reflog 的
 // 「hash ␟ reflog 說明 ␟ commit 標題 ␞」加上 --numstat。
