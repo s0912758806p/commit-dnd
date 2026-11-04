@@ -2,7 +2,7 @@
 
 這個專案是什麼，見 [README](../README.md)。
 
-目前進度：**迭代 3（無盡地下城）**——孵蛋、commit 給經驗與升級、每日補給、飽足／心情／HP 隨時間變化、冒險日誌；Claude Code 的 AI 回合帶寵物闖地下城，commit 救援與鑑定裝備。
+目前進度：**迭代 4（收服、合體技、圖鑑與隊伍）**——孵蛋、commit 給經驗與升級、每日補給、飽足／心情／HP 隨時間變化、冒險日誌；Claude Code 的 AI 回合帶寵物闖地下城，commit 救援與鑑定裝備；`fix:` commit 收服怪物組隊，AI 工作中的 commit 發動合體技。
 
 ## 安裝
 
@@ -40,6 +40,13 @@ dnd log              # 冒險日誌
 - 閒置 8 小時（下班、睡覺）會紮營，HP 回滿。
 - 屬性：火剋草、草剋水、水剋火。怪物、樓層、裝備定義在 `content/monsters.yaml`、`floors.yaml`、`items.yaml`。
 
+**收服、合體技、圖鑑與隊伍**：
+- **收服**：`fix:` 的 commit 會試著收服眼前的一般怪物（Boss 不行）。機率是 40%，怪物越虛弱越高（每損失 10% HP 加 4%，最高近 80%）。成功時怪物離開戰鬥、算這層打倒一隻，但不掉裝備；倒地中的那筆 commit 只會救援，不會收服。
+- **隊伍**：最多 3 隻、同種只能一隻。收服時隊伍有空位就自動加入；每位隊員讓寵物攻擊增加（該怪物在最深收服樓層的攻擊力 × 25%，至少 +1），所以往深處收服的同種怪物會讓隊員變強。用 `dnd party add|remove <怪物 id>` 調整，id 見 `dnd dex`。
+- **合體技**：commit 前 30 分鐘內有 AI 活動（Claude 的回合或工具呼叫）時，這筆 commit 會對眼前的怪物（含 Boss）造成寵物攻擊 ×200% 的傷害，每位隊員再 +50%，打倒照常掉落。同一筆 `fix:` 收服成功就不再發動。
+- **圖鑑**：`dnd dex` 列出所有怪物：收服過的、遇過還沒收服的、沒遇過的（顯示 `???`）。早期樓層的怪物很快就遇不到了，想補齊圖鑑可以用 `dnd warp 0` 回入口重新走一趟。
+- 數值在 `content/balance.yaml` 的 `party` 區塊，日誌在 `content/logs.yaml` 的 `party` 區塊。
+
 **接上 Claude Code**：執行 `dnd install claude`，確認差異後寫入。Claude Code 會自動重新載入設定，不需要重啟；底部 statusline 會顯示寵物與今日 AI 回合。設定檔位置依序為 `--settings`、`$CLAUDE_CONFIG_DIR/settings.json`、`~/.claude/settings.json`。
 
 ## 指令
@@ -49,8 +56,12 @@ dnd log              # 冒險日誌
 | `dnd hatch [--species id] [--name 名字]` | 孵出寵物；沒給參數時互動詢問 |
 | `dnd status` | 寵物現在的狀態（不寫檔） |
 | `dnd log [-n 20]` | 最近的冒險日誌（`-n 0` 顯示全部） |
-| `dnd dungeon` | 地下城：樓層與這層進度、眼前的怪物、倒地狀態、攻防、裝備、未鑑定背包、戰績（不寫檔） |
+| `dnd dungeon` | 地下城：樓層與這層進度、眼前的怪物、倒地狀態、攻防、裝備、隊伍摘要、未鑑定背包、戰績（不寫檔） |
 | `dnd warp <樓層>` | 傳送到入口（`0`）或已解鎖的 Boss 層（打倒過 Boss 的 B10、B20…）；倒地中不能傳送 |
+| `dnd dex` | 圖鑑：每種怪物收服幾次、最深收服樓層、是否在隊伍中；遇過還沒收服的顯示遇過次數，沒遇過的顯示 `???`（不寫檔） |
+| `dnd party` | 隊伍：隊員與攻擊加成、可換上的候補、合體技現在是否就緒（不寫檔） |
+| `dnd party add <怪物 id>` | 讓收服過的怪物加入隊伍（最多 3 隻、同種一隻）；不合法時印出原因、狀態不變 |
+| `dnd party remove <怪物 id>` | 讓隊員離開隊伍 |
 | `dnd statusline` | Claude Code 底部的一行（等級、XP、HP、飽足、補給、樓層／倒地、今日 AI 回合）；不寫檔、永遠成功 |
 | `dnd doctor [--repo .] [--settings 路徑]` | 檢查資料、寵物、hook 錯誤紀錄、git hook 與 Claude Code 設定；只讀，有問題時 exit 1 |
 | `dnd install git [--repo .]` | 在 repo 的 post-commit 加入 dnd；已有 hook 時只插入標記區塊 |
@@ -120,16 +131,16 @@ GitHub Actions（`.github/workflows/ci.yml`）在每個 PR 與 push 到 `main` �
 
 ```
 cmd/dnd/                 CLI（Cobra），只負責組裝
-content/                 嵌入的 YAML：balance（數值）、species（物種）、logs（日誌模板）
+content/                 嵌入的 YAML：balance（數值）、species（物種）、logs（日誌模板）、monsters／floors／items（地下城）
 internal/adapter/claude/ Claude Code hook 的 stdin JSON → turn／tool_use 事件（testdata/ 是去識別化樣本）
 internal/adapter/git/    post-commit 時的 git 輸出 → commit 事件（testdata/ 是真實樣本）
 internal/clock/          CLI 的「現在」：真實時間 ＋ dnd debug time 的偏移（只在 DND_DEBUG=1 時）
-internal/engine/         Apply 與 State（debug.go 是 debug_xp／debug_floor）
+internal/engine/         Apply 與 State；dungeon.go 地下城、capture.go 收服／合體技／圖鑑／隊伍；debug.go 是 debug_xp／debug_floor
 internal/event/          Event 型別
 internal/home/           DND_HOME 解析
 internal/install/        git post-commit hook 的安裝與移除
 internal/store/          events.jsonl / state.json / 檔案鎖
-internal/view/           status、log 的排版（testdata/golden/ 守住輸出）
+internal/view/           status、statusline、dungeon、dex、party、log 的排版（testdata/golden/ 守住輸出）
 docs/DESIGN-NOTES.md     已採用的設計決定與待決事項
 docs/hero.svg            README 的主視覺
 ```

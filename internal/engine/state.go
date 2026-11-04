@@ -3,7 +3,7 @@ package engine
 import "time"
 
 // StateVersion 是 state.json 的格式版本。state.json 只是快取，版本不符時 store 會從 events.jsonl 重建。
-const StateVersion = 5
+const StateVersion = 6
 
 // State 是遊戲的完整狀態。所有數值一律用整數，確保 JSON 往返與跨平台重播結果完全相同。
 // State 必須保持可比較（不含 map／slice），測試直接用 == 比對。
@@ -17,6 +17,8 @@ type State struct {
 	Pet        Pet     `json:"pet"`
 	AI         AI      `json:"ai"`
 	Dungeon    Dungeon `json:"dungeon"`
+	Dex        Dex     `json:"dex"`   // 圖鑑（迭代 4，見 capture.go）
+	Party      Party   `json:"party"` // 收服的隊伍與合體技
 }
 
 // BagSize 是未鑑定掉落物的背包容量；滿了之後新的掉落物會被丟掉。

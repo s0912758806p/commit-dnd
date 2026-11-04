@@ -27,7 +27,7 @@ func newRoot() *cobra.Command {
 		Short:        "Dungeons & Diffs：用 commit 與 AI 工作養寵物、闖地下城",
 		SilenceUsage: true,
 	}
-	root.AddCommand(newHatchCmd(), newStatusCmd(), newDungeonCmd(), newWarpCmd(), newLogCmd(), newStatuslineCmd(), newDoctorCmd(), newInstallCmd(), newUninstallCmd(), newHookCmd(), newEventCmd())
+	root.AddCommand(newHatchCmd(), newStatusCmd(), newDungeonCmd(), newWarpCmd(), newDexCmd(), newPartyCmd(), newLogCmd(), newStatuslineCmd(), newDoctorCmd(), newInstallCmd(), newUninstallCmd(), newHookCmd(), newEventCmd())
 	if os.Getenv("DND_DEBUG") == "1" {
 		root.AddCommand(newDebugCmd())
 	}
