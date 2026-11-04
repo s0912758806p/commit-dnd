@@ -3,7 +3,7 @@ package engine
 import "time"
 
 // StateVersion 是 state.json 的格式版本。state.json 只是快取，版本不符時 store 會從 events.jsonl 重建。
-const StateVersion = 7
+const StateVersion = 8
 
 // State 是遊戲的完整狀態。所有數值一律用整數，確保 JSON 往返與跨平台重播結果完全相同。
 // State 必須保持可比較（不含 map／slice），測試直接用 == 比對。
@@ -88,6 +88,8 @@ type Pet struct {
 	Spec    string `json:"spec"`    // 特化 id；空字串表示尚未選擇
 	Stage   int    `json:"stage"`   // 進化階段，孵出時為 1
 	Scrolls int    `json:"scrolls"` // 持有的轉職卷軸
+	Final   string `json:"final"`   // 這一輪取得的終職 id；空字串表示還沒（見 rebirth.go）
+	Legacy  Legacy `json:"legacy"`  // 跨轉生保留：轉生次數與各終職等級
 	Mix     Mix    `json:"mix"`     // commit 組成（commit_mix）
 	Level   int    `json:"level"`
 	XP      int    `json:"xp"` // 本級已累積的 XP，升級時扣掉該級成本
@@ -132,4 +134,6 @@ const (
 	EffectCamp    Effect = "camp"
 	EffectClass   Effect = "class"
 	EffectEvolve  Effect = "evolve"
+	EffectFinal   Effect = "final"
+	EffectRebirth Effect = "rebirth"
 )

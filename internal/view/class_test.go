@@ -45,7 +45,14 @@ func TestClass(t *testing.T) {
 	ready.Level, ready.Stage, ready.Scrolls = 15, 2, 1
 	chosen := ready
 	chosen.Spec, chosen.Level, chosen.Stage, chosen.Scrolls = "bulwark", 21, 3, 3
+	// 迭代 6：這一輪取得終職、可以轉生；之前已轉生一次並取得過兩種終職。
+	final := chosen
+	final.Level, final.Final = 31, "citadel"
+	final.Legacy.Rebirths, final.Legacy.FinalN = 1, 2
+	final.Legacy.Finals[0] = engine.FinalEntry{ID: "citadel", Level: 2}
+	final.Legacy.Finals[1] = engine.FinalEntry{ID: "inquisitor", Level: 1}
 	cases := map[string]engine.Pet{
+		"class_final.txt":    final,
 		"class_unjudged.txt": egg,
 		"class_empty.txt":    {Species: "elf", Name: "小精", Stage: 1, Level: 1},
 		"class_judged.txt":   classed,
@@ -58,4 +65,14 @@ func TestClass(t *testing.T) {
 		})
 	}
 	golden(t, "dungeon_egg.txt", Class(engine.State{}, c)) // 沒有寵物時同 dungeon 的提示
+}
+
+func TestStatusRebirthRow(t *testing.T) {
+	c, err := content.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := engine.Pet{Species: "human", Name: "GR騎士", Stage: 1, Level: 3, XP: 10, HP: 30, Satiety: 800, Mood: 600}
+	p.Legacy.Rebirths = 2
+	golden(t, "status_rebirth.txt", Status(engine.State{Pet: p}, c, now))
 }

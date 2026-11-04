@@ -111,9 +111,43 @@ scroll:
   drop_pct: 50
   max: 3
 
+# 終職（迭代 6）：Lv final_level 時，依當時的特化取得對應的終職（每個特化一種）；還沒選特化的話，
+# 之後選特化的那一刻取得。每一輪只會取得一次。終職能力是被動的，會跨轉生保留；同一個終職再次取得時強化一級。
+# 能力的效果 = per_level × 等級。能力只強化 commit 與玩法，**不會讓 AI 回血或免除倒地**（DEVPLAN 鐵律）：
+#   combo_pct        合體技倍率 +N%                  satiety_slow   飽足下降速度 −N%（最多 −90%）
+#   capture_pct      收服機率 +N%（最多 100%）        rescue_hp_pct  commit 救起時的 HP +N%（最多 100%）
+#   kind_xp_pct      kind 類型 commit 的 XP +N%       keep_on_down   倒地時保留 N 件未鑑定裝備（最舊的先留）
+#   item_power       鑑定出的裝備強度 +N             commit_heal    每筆 commit 多回 N 點 HP
+#   element_pct      屬性相剋時的傷害倍率 +N%         supply_commits 每天的補給次數 +N
+#   party_pct        隊伍攻擊加成 +N%                scroll_pct     轉職卷軸掉落機率 +N%
+final_level: 30
+finals:
+  - {id: dawn_archer,     spec: marksman,     name: 破曉射手,   ability: combo_pct,      per_level: 50}
+  - {id: starwalker,      spec: wayfarer,     name: 星界旅人,   ability: satiety_slow,   per_level: 25}
+  - {id: inquisitor,      spec: exorcist,     name: 審判者,     ability: capture_pct,    per_level: 10}
+  - {id: seer,            spec: oracle,       name: 天啟者,     ability: rescue_hp_pct,  per_level: 20}
+  - {id: lightwarden,     spec: paladin,      name: 聖光守護者, ability: kind_xp_pct,    per_level: 50, kind: test}
+  - {id: citadel,         spec: bulwark,      name: 不落要塞,   ability: keep_on_down,   per_level: 2}
+  - {id: master_smith,    spec: runesmith,    name: 傳奇工匠,   ability: item_power,     per_level: 1}
+  - {id: panacea,         spec: apothecary,   name: 萬靈藥師,   ability: commit_heal,    per_level: 10}
+  - {id: elemental_lord,  spec: elementalist, name: 元素主宰,   ability: element_pct,    per_level: 25}
+  - {id: archsage,        spec: sage,         name: 大賢者,     ability: supply_commits, per_level: 1}
+  - {id: warlord,         spec: mercenary,    name: 傳奇傭兵,   ability: party_pct,      per_level: 25}
+  - {id: treasure_hunter, spec: scavenger,    name: 寶藏獵人,   ability: scroll_pct,     per_level: 25}
+
+# 轉生（迭代 6）：取得終職且 Lv ≥ level 時，使用者用 dnd rebirth 決定是否轉生。
+# 重置：等級、XP、職業、特化、進化、轉職卷軸、裝備、未鑑定背包、樓層、最深樓層與傳送點。
+# 保留：種族、名字、commit 組成、圖鑑、隊伍、終職能力、轉生次數，以及飽足、心情、補給與戰績。
+# 每轉生一次，攻擊、防禦、HP 上限的基礎加成 +stats_pct%，commit 的 XP +xp_pct%（都會累加）。
+rebirth:
+  level: 30
+  stats_pct: 10
+  xp_pct: 20
+
 # 日誌模板。除了 logs.yaml 的 {name}、{level}、{species}，另有：{class} 職業名、{style} 職業類型、
 # {spec} 特化名、{stage} 進化名、{stage_n} 第幾階段、{reason} 原因、{monster} 怪物名、
-# {scrolls}／{scroll_max} 卷軸數量。
+# {scrolls}／{scroll_max} 卷軸數量、{final} 終職名、{final_level} 終職等級、{ability} 能力說明、
+# {rebirths} 轉生次數、{stats}／{xp} 轉生後的總加成。
 logs:
   judge: "{name} 依 commit 組成轉職為{class}（{style}）！"
   spec_ready: "{name} 可以選擇特化了，用 dnd class 看看有哪些方向。"
@@ -125,3 +159,7 @@ logs:
   reroll: "{name} 讀了轉職卷軸，重新轉職為{class}（{style}）。"
   reroll_same: "{name} 讀了轉職卷軸，職業仍是{class}，特化重置了，可以重新選擇。"
   reroll_denied: "無法使用轉職卷軸：{reason}。"
+  final: "{name} 到達了巔峰，成為終職「{final}」！獲得能力：{ability}。"
+  final_up: "{name} 再次成為「{final}」，能力強化到 Lv {final_level}：{ability}。"
+  rebirth: "{name} 轉生了！這是第 {rebirths} 次轉生：基礎能力 +{stats}%、經驗 +{xp}%，終職能力全部保留。"
+  rebirth_denied: "還不能轉生：{reason}。"

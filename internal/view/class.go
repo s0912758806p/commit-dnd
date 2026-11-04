@@ -41,7 +41,23 @@ func Class(s engine.State, c *content.Pack) string {
 	} else {
 		row("進化", "%s，已是最終階段", stageName(p, c))
 	}
-	row("加成", "%s（職業＋特化＋進化，加在不含裝備的能力上）", stats(engine.Bonus(p, c)))
+	switch f, ok := c.FinalByID(p.Final); {
+	case ok:
+		row("終職", "%s（這一輪已取得）", f.Name)
+	case p.Spec != "":
+		row("終職", "Lv %d 取得", g.FinalLevel)
+	default:
+		row("終職", "Lv %d、選好特化後取得", g.FinalLevel)
+	}
+	row("加成", "%s（職業＋特化＋進化＋轉生，加在不含裝備的能力上）", stats(engine.Bonus(p, c)))
+	if n := p.Legacy.Rebirths; n > 0 {
+		row("轉生", "%d 次（基礎能力 +%d%%、經驗 +%d%%）", n, engine.RebirthStats(p, c).Atk, engine.RebirthXPPct(p, c))
+	}
+	if ok, reason := engine.CanRebirth(s, c); ok {
+		row("轉生", "可以轉生了：dnd rebirth")
+	} else if p.Final != "" {
+		row("轉生", "還不能轉生：%s", reason)
+	}
 	if p.Scrolls > 0 {
 		row("卷軸", "轉職卷軸 %d/%d 張（dnd class reroll 依目前的 commit 組成重新判定）", p.Scrolls, g.Scroll.Max)
 	} else {
@@ -60,14 +76,34 @@ func Class(s engine.State, c *content.Pack) string {
 				mark = " ← 已選"
 			}
 			fmt.Fprintf(&b, "  %s：%s（%s）%s\n", sp.ID, sp.Name, stats(sp.Stats), mark)
+			if f, ok := c.FinalForSpec(sp.ID); ok {
+				next := p.Legacy.FinalLevel(f.ID) + 1 // 下一次取得時的等級
+				fmt.Fprintf(&b, "      → 終職 %s Lv %d：%s\n", f.Name, next, f.AbilityText(next))
+			}
 		}
+		legacy(&b, p, c)
 		return b.String()
 	}
 	b.WriteString("\n職業一覽（commit 組成裡哪一類明顯偏多，就成為哪個職業）：\n")
 	for _, cl := range g.Classes {
 		fmt.Fprintf(&b, "  %s（%s）：%s 多（%s）\n", cl.Name, cl.Style, strings.Join(cl.Kinds, "／"), stats(cl.Stats))
 	}
+	legacy(&b, p, c)
 	return b.String()
+}
+
+// legacy 列出跨轉生保留的終職能力；還沒有任何終職時不輸出。
+func legacy(b *strings.Builder, p engine.Pet, c *content.Pack) {
+	l := p.Legacy
+	if l.FinalN == 0 {
+		return
+	}
+	b.WriteString("\n終職能力（跨轉生保留，同一終職再次取得會強化）：\n")
+	for _, en := range l.Finals[:l.FinalN] {
+		if f, ok := c.FinalByID(en.ID); ok {
+			fmt.Fprintf(b, "  %s Lv %d：%s\n", f.Name, en.Level, f.AbilityText(en.Level))
+		}
+	}
 }
 
 // className 是 status 的職業欄：「遊俠（開拓型）」，選了特化時接上「・神射手」。
@@ -82,6 +118,9 @@ func className(p engine.Pet, c *content.Pack) string {
 	name := fmt.Sprintf("%s（%s）", cl.Name, cl.Style)
 	if sp, ok := c.SpecByID(p.Class, p.Spec); ok {
 		name += "・" + sp.Name
+	}
+	if f, ok := c.FinalByID(p.Final); ok {
+		name += "・終職" + f.Name
 	}
 	return name
 }
