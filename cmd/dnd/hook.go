@@ -17,7 +17,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// `dnd hook git`（post-commit）與 `dnd hook claude`（Claude Code hook）：隱藏指令，不輸出任何東西、永遠 exit 0。
+// `dnd hook git`（post-commit）、`dnd hook claude`（Claude Code hook）與 `dnd hook codex`（Codex notify，見 codex.go）：
+// 隱藏指令，不輸出任何東西、永遠 exit 0。
 func newHookCmd() *cobra.Command {
 	hook := &cobra.Command{Use: "hook", Short: "給外部工具呼叫的 hook", Hidden: true}
 	hook.AddCommand(&cobra.Command{
@@ -34,6 +35,7 @@ func newHookCmd() *cobra.Command {
 			runHook("claude", func() error { return hookClaude(cmd.InOrStdin()) })
 		},
 	})
+	hook.AddCommand(newHookCodexCmd())
 	return hook
 }
 

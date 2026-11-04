@@ -34,6 +34,7 @@ dnd log              # 冒險日誌
 
 **無盡地下城**（接上 Claude Code 之後）：
 - Claude 的每個回合，寵物會遇到下一隻怪物或被眼前的怪物攻擊；Claude 改檔案（Edit、Write）時，寵物會出手攻擊。
+- Codex 的通知裡沒有個別的工具呼叫，所以 **Codex 的每個回合＝寵物先攻擊一次，再結束回合**（遇怪或被打）。
 - 每層打倒 6 隻往下一層；每 10 層有 Boss，打倒後可以用 `dnd warp <樓層>` 傳送回來。
 - 打倒怪物會掉「未鑑定」的裝備；每次 commit 鑑定一件，比身上的強才換上。
 - HP 歸零就倒地：未鑑定的裝備全部遺失，AI 也不能再帶牠前進或回血，**下一次 commit 會把牠救起來**，在同一層繼續。
@@ -49,6 +50,8 @@ dnd log              # 冒險日誌
 
 **接上 Claude Code**：執行 `dnd install claude`，確認差異後寫入。Claude Code 會自動重新載入設定，不需要重啟；底部 statusline 會顯示寵物與今日 AI 回合。設定檔位置依序為 `--settings`、`$CLAUDE_CONFIG_DIR/settings.json`、`~/.claude/settings.json`。
 
+**接上 Codex**：執行 `dnd install codex`，確認差異後寫入。只會改 `config.toml` 最上層的 `notify` 一行（設成 `["<dnd 路徑>", "hook", "codex"]`），其他設定、註解與順序都不動；已經開著的 Codex 要重新啟動才會讀到。設定檔位置依序為 `--config`、`$CODEX_HOME/config.toml`、`~/.codex/config.toml`。原本就有自己的 `notify`（例如桌面通知）時，它會存到 `$DND_HOME/codex/original-notify.json`，`dnd hook codex` 寫完寵物的事件後，再用同樣的參數執行它；兩邊的失敗互不影響。`dnd uninstall codex` 會還原原本那一行。
+
 ## 指令
 
 | 指令 | 說明 |
@@ -63,15 +66,17 @@ dnd log              # 冒險日誌
 | `dnd party add <怪物 id>` | 讓收服過的怪物加入隊伍（最多 3 隻、同種一隻）；不合法時印出原因、狀態不變 |
 | `dnd party remove <怪物 id>` | 讓隊員離開隊伍 |
 | `dnd statusline` | Claude Code 底部的一行（等級、XP、HP、飽足、補給、樓層／倒地、今日 AI 回合）；不寫檔、永遠成功 |
-| `dnd doctor [--repo .] [--settings 路徑]` | 檢查資料、寵物、hook 錯誤紀錄、git hook 與 Claude Code 設定；只讀，有問題時 exit 1 |
+| `dnd doctor [--repo .] [--settings 路徑] [--codex-config 路徑]` | 檢查資料、寵物、hook 錯誤紀錄、git hook、Claude Code 與 Codex 設定；只讀，有問題（✗）時 exit 1。沒用 Codex 時只顯示提醒（!） |
 | `dnd install git [--repo .]` | 在 repo 的 post-commit 加入 dnd；已有 hook 時只插入標記區塊 |
 | `dnd uninstall git [--repo .]` | 移除 dnd 區塊；檔案只剩 shebang 時整個刪除 |
 | `dnd install claude [--settings 路徑] [--yes]` | 在 Claude Code 的 settings.json 加入 PostToolUse／Stop hook（背景執行）與 statusLine；先印差異、確認、備份成 `settings.json.dnd-backup-時間`，再寫入 |
 | `dnd uninstall claude [--settings 路徑] [--yes]` | 移除 dnd 的 hook 與 statusLine，還原安裝前的 statusLine；同樣先印差異、確認、備份 |
+| `dnd install codex [--config 路徑] [--yes]` | 把 Codex `config.toml` 的 `notify` 設成 dnd（原本有別的 notify 時改成串接）；先印差異、確認、備份成 `config.toml.dnd-backup-時間`，再寫入 |
+| `dnd uninstall codex [--config 路徑] [--yes]` | notify 是 dnd 時，還原安裝前的 notify（沒有就刪掉那一行）；同樣先印差異、確認、備份 |
 | `dnd event <source> <type> [key=value...] [--count N]` | 手動寫入事件（開發用）。source：`git`、`claude`、`codex`、`user`、`tick`；寫法見下方「除錯指令」 |
 | `dnd debug …` | 除錯指令，只在 `DND_DEBUG=1` 時出現，見下方「除錯指令」 |
 
-`dnd hook git`（post-commit）與 `dnd hook claude`（Claude Code 的 PostToolUse／Stop）是隱藏指令：不輸出、永遠成功，錯誤寫進 `$DND_HOME/errors.log`。
+`dnd hook git`（post-commit）、`dnd hook claude`（Claude Code 的 PostToolUse／Stop）與 `dnd hook codex <payload>`（Codex 的 notify，JSON 在最後一個參數）是隱藏指令：不輸出、永遠成功，錯誤寫進 `$DND_HOME/errors.log`。
 
 **Claude Code 的 AI 活動**：每個 AI 回合（Stop）與工具呼叫（PostToolUse）都會被記錄。迭代 2 只計數、不影響寵物；AI 不能幫寵物回血或給經驗。從迭代 3 起，AI 回合會推進地下城。
 
@@ -85,7 +90,9 @@ dnd log              # 冒險日誌
 | `$DND_HOME/state.json` | 最新狀態的快取，可以刪掉，用 `dnd debug rebuild` 重建 |
 | `$DND_HOME/errors.log` | hook 失敗的紀錄（hook 本身不會讓 commit 或 Claude Code 失敗） |
 | `$DND_HOME/claude/original-statusline.json` | 安裝前原本的 Claude Code statusLine（有才會存在） |
+| `$DND_HOME/codex/original-notify.json` | 安裝前原本的 Codex notify（陣列與原文；有才會存在） |
 | `$DND_HOME/capture/claude/` | 手動建立這個目錄時，`dnd hook claude` 會把收到的原始 JSON 存在這裡（收集測試樣本用） |
+| `$DND_HOME/capture/codex/` | 同上，`dnd hook codex` 依 payload 的 `type` 存檔（內含對話內容，放進 testdata 前要去識別化） |
 | `$DND_HOME/lock` | 寫入用的檔案鎖 |
 | `$DND_HOME/debug-time-offset` | `dnd debug time` 的時間偏移；只在 `DND_DEBUG=1` 時生效，殘留時 `dnd doctor` 會提醒 |
 | `$DND_HOME/snapshots/` | `dnd debug snapshot` 存的快照 |
@@ -123,6 +130,8 @@ make ci     # gofmt 檢查、go vet、go test -race（commit 前跑）
 go test ./internal/view -update                          # 改了顯示格式後更新 golden 檔
 go test ./cmd/dnd -run DebugStats -update                # 改了 dnd debug stats 的格式後更新 golden 檔
 go test ./internal/adapter/git -run '^$' -fuzz FuzzParse # 模糊測試 git 輸出解析
+go test ./internal/adapter/codex -run '^$' -fuzz FuzzParse        # Codex notify payload
+go test ./internal/install -run '^$' -fuzz FuzzCodexInstall       # config.toml 的 notify 編輯
 ```
 
 GitHub Actions（`.github/workflows/ci.yml`）在每個 PR 與 push 到 `main` 時跑同一個 `make ci`。
@@ -133,12 +142,13 @@ GitHub Actions（`.github/workflows/ci.yml`）在每個 PR 與 push 到 `main` �
 cmd/dnd/                 CLI（Cobra），只負責組裝
 content/                 嵌入的 YAML：balance（數值）、species（物種）、logs（日誌模板）、monsters／floors／items（地下城）
 internal/adapter/claude/ Claude Code hook 的 stdin JSON → turn／tool_use 事件（testdata/ 是去識別化樣本）
+internal/adapter/codex/  Codex notify 的 payload → tool_use（Codex）＋turn 事件（testdata/ 依原始碼格式手寫）
 internal/adapter/git/    post-commit 時的 git 輸出 → commit 事件（testdata/ 是真實樣本）
 internal/clock/          CLI 的「現在」：真實時間 ＋ dnd debug time 的偏移（只在 DND_DEBUG=1 時）
 internal/engine/         Apply 與 State；dungeon.go 地下城、capture.go 收服／合體技／圖鑑／隊伍；debug.go 是 debug_xp／debug_floor
 internal/event/          Event 型別
 internal/home/           DND_HOME 解析
-internal/install/        git post-commit hook 的安裝與移除
+internal/install/        git post-commit hook、Claude Code settings.json、Codex config.toml 的安裝、移除與 doctor 檢查
 internal/store/          events.jsonl / state.json / 檔案鎖
 internal/view/           status、statusline、dungeon、dex、party、log 的排版（testdata/golden/ 守住輸出）
 docs/DESIGN-NOTES.md     已採用的設計決定與待決事項

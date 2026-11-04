@@ -66,7 +66,7 @@ dungeon:
   camp_after_hours: 8          # 沒有任何 commit／AI 活動超過 8 小時就紮營，HP 回滿（倒地中不會復活）
   item_power_base: 1           # 裝備強度 = 1 + 掉落樓層 ÷ 5 + 0～2 的隨機
   item_power_per_floors: 5
-  attack_tools: [Edit, Write, MultiEdit, NotebookEdit]  # 這些工具呼叫一次 = 寵物攻擊一次
+  attack_tools: [Edit, Write, MultiEdit, NotebookEdit, Codex]  # 這些工具呼叫一次 = 寵物攻擊一次；Codex = 一個 Codex 回合（notify 沒有個別工具呼叫）
 
 party:                         # 迭代 4：收服、合體技與隊伍（隊伍最多 3 隻，寫在引擎裡）
   capture_base_pct: 40         # fix: commit 時收服眼前一般怪物的機率 = 40% + 40% × 怪物已損失 HP 的比例

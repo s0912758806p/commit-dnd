@@ -109,6 +109,7 @@ func TestInstallUninstallGit(t *testing.T) {
 
 func TestDoctor(t *testing.T) {
 	t.Setenv("DND_HOME", t.TempDir())
+	t.Setenv("CODEX_HOME", t.TempDir()) // 不讀使用者真正的 ~/.codex
 	repo := gitRepo(t)
 	settings := filepath.Join(t.TempDir(), "settings.json")
 

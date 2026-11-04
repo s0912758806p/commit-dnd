@@ -12,10 +12,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// `dnd doctor`：檢查資料目錄、寵物、hook 錯誤紀錄、git hook 與 Claude Code 設定。只讀，不改任何東西。
+// `dnd doctor`：檢查資料目錄、寵物、hook 錯誤紀錄、git hook、Claude Code 與 Codex 設定。只讀，不改任何東西。
 // 有 ✗ 的項目時 exit 1；! 只是提醒。
 func newDoctorCmd() *cobra.Command {
-	var repo, settings string
+	var repo, settings, codexConfig string
 	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "檢查 dnd 的安裝與資料是否正常",
@@ -25,12 +25,17 @@ func newDoctorCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			codexConfig, err := install.CodexConfigPath(codexConfig)
+			if err != nil {
+				return err
+			}
 			d := &doctor{cmd: cmd}
 			d.binary()
 			d.data()
 			d.debugTime()
 			d.gitHook(repo)
 			d.claude(settings)
+			d.codex(codexConfig)
 			if d.failed > 0 {
 				return fmt.Errorf("有 %d 項需要處理", d.failed)
 			}
@@ -40,6 +45,7 @@ func newDoctorCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&repo, "repo", ".", "要檢查 git hook 的 repo")
 	cmd.Flags().StringVar(&settings, "settings", "", "Claude Code 的 settings.json（預設依 CLAUDE_CONFIG_DIR 或 ~/.claude）")
+	cmd.Flags().StringVar(&codexConfig, "codex-config", "", "Codex 的 config.toml（預設依 CODEX_HOME 或 ~/.codex）")
 	return cmd
 }
 
