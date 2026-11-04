@@ -1,8 +1,7 @@
 package main
 
 import (
-	"time"
-
+	"github.com/s0912758806p/commit-dnd/internal/clock"
 	"github.com/s0912758806p/commit-dnd/internal/engine"
 	"github.com/s0912758806p/commit-dnd/internal/event"
 	"github.com/s0912758806p/commit-dnd/internal/view"
@@ -24,7 +23,7 @@ func newDungeonCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			st = engine.Apply(st, event.Event{At: time.Now(), Source: event.SourceTick, Type: "tick"}, pack).State
+			st = engine.Apply(st, event.Event{At: clock.Now(), Source: event.SourceTick, Type: "tick"}, pack).State
 			printf(cmd, "%s", view.Dungeon(st, pack))
 			return nil
 		},

@@ -11,6 +11,7 @@
 //   - turn／tool_use：計數 AI 回合與工具呼叫（孵蛋前也計數）；孵蛋後推進地下城（見 dungeon.go）
 //   - warp：使用者的傳送指令（見 dungeon.go）
 //   - party：使用者調整隊伍（見 capture.go）
+//   - debug_xp／debug_floor：`dnd debug xp`／`dnd debug floor` 寫入的除錯事件（見 debug.go）
 //   - 其他類型（含 tick）：只推進時間
 //
 // commit 會先救起倒地的寵物、最後鑑定一件未鑑定裝備，接著處理 fix: 的收服與合體技（見 capture.go）。
@@ -97,6 +98,8 @@ func Apply(s State, e event.Event, c *content.Pack) Result {
 		} else {
 			r.log(e.At, c, c.Logs.NoPet, nil)
 		}
+	case "debug_xp", "debug_floor":
+		debugEvent(&r, e, c)
 	}
 	switch e.Type {
 	case "commit", "turn", "tool_use":
@@ -237,6 +240,14 @@ func commit(r *Result, e event.Event, c *content.Pack) {
 	}
 	r.log(e.At, c, pick(tmpls, ci.Hash, e.Seq), map[string]string{"xp": strconv.Itoa(xp), "lines": strconv.Itoa(lines)})
 
+	levelUp(r, e, c)
+	identifyOne(r, e, c)
+	afterCommit(r, e, c, downed)
+}
+
+// levelUp 在 XP 足夠時連續升級，每升一級 HP 回滿。commit 與 debug_xp 共用。
+func levelUp(r *Result, e event.Event, c *content.Pack) {
+	p := &r.State.Pet
 	for cost := c.Cost(p.Level); cost > 0 && p.XP >= cost; cost = c.Cost(p.Level) {
 		p.XP -= cost
 		p.Level++
@@ -244,8 +255,6 @@ func commit(r *Result, e event.Event, c *content.Pack) {
 		r.log(e.At, c, c.Logs.Levelup, nil)
 		r.Fx = append(r.Fx, EffectLevelUp)
 	}
-	identifyOne(r, e, c)
-	afterCommit(r, e, c, downed)
 }
 
 func pet(r *Result, e event.Event, c *content.Pack) {

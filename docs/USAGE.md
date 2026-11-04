@@ -68,8 +68,8 @@ dnd log              # 冒險日誌
 | `dnd uninstall git [--repo .]` | 移除 dnd 區塊；檔案只剩 shebang 時整個刪除 |
 | `dnd install claude [--settings 路徑] [--yes]` | 在 Claude Code 的 settings.json 加入 PostToolUse／Stop hook（背景執行）與 statusLine；先印差異、確認、備份成 `settings.json.dnd-backup-時間`，再寫入 |
 | `dnd uninstall claude [--settings 路徑] [--yes]` | 移除 dnd 的 hook 與 statusLine，還原安裝前的 statusLine；同樣先印差異、確認、備份 |
-| `dnd event <source> <type> [key=value...]` | 手動寫入一個事件（開發用）。source：`git`、`claude`、`codex`、`user`、`tick` |
-| `dnd debug rebuild` | 從 events.jsonl 重播並覆寫 state.json；只在 `DND_DEBUG=1` 時出現 |
+| `dnd event <source> <type> [key=value...] [--count N]` | 手動寫入事件（開發用）。source：`git`、`claude`、`codex`、`user`、`tick`；寫法見下方「除錯指令」 |
+| `dnd debug …` | 除錯指令，只在 `DND_DEBUG=1` 時出現，見下方「除錯指令」 |
 
 `dnd hook git`（post-commit）與 `dnd hook claude`（Claude Code 的 PostToolUse／Stop）是隱藏指令：不輸出、永遠成功，錯誤寫進 `$DND_HOME/errors.log`。
 
@@ -87,8 +87,33 @@ dnd log              # 冒險日誌
 | `$DND_HOME/claude/original-statusline.json` | 安裝前原本的 Claude Code statusLine（有才會存在） |
 | `$DND_HOME/capture/claude/` | 手動建立這個目錄時，`dnd hook claude` 會把收到的原始 JSON 存在這裡（收集測試樣本用） |
 | `$DND_HOME/lock` | 寫入用的檔案鎖 |
+| `$DND_HOME/debug-time-offset` | `dnd debug time` 的時間偏移；只在 `DND_DEBUG=1` 時生效，殘留時 `dnd doctor` 會提醒 |
+| `$DND_HOME/snapshots/` | `dnd debug snapshot` 存的快照 |
 
 `DND_HOME` 未設定時為 `~/.dnd`。**開發測試一律用 `DND_HOME=./tmp/dnd`**（`tmp/` 已在 `.gitignore`），避免弄壞正式遊玩的寵物。
+
+## 除錯指令
+
+設定 `DND_DEBUG=1` 才會出現 `dnd debug`，正式玩法裡沒有。**一律搭配 `DND_HOME=./tmp/dnd`**，不要拿正式的寵物測試：
+
+```bash
+export DND_HOME=./tmp/dnd DND_DEBUG=1
+dnd hatch --species elf --name 測試
+```
+
+| 指令 | 說明 |
+| --- | --- |
+| `dnd debug time [+8h\|-1h\|reset]` | 快轉或倒轉「現在」（累加；不帶參數顯示目前偏移）。測飽足衰減、紮營、HP 自動回滿。偏移存在 `DND_HOME`，只在 `DND_DEBUG=1` 時生效 |
+| `dnd debug xp <N>` | 直接給 N 點 XP，照正常流程升級 |
+| `dnd debug floor <N>` | 跳到第 N 層（`0` 是入口）：清掉眼前的怪物、這層進度歸零，更新最深樓層。測怪物強度與推不動的感覺 |
+| `dnd debug event <source> <type> [key=value...] [--count N]` | 和 `dnd event` 同一個指令，不開 Claude Code 也能模擬 AI 回合，例如 `debug event claude turn --count 10`、`debug event claude tool_use tool=Edit`、`debug event git commit kind=fix added=10`（commit 會自動帶不重複的 hash，才會計分） |
+| `dnd debug snapshot save <名稱> [--force]` | 把 events.jsonl、state.json、時間偏移、errors.log 存到 `$DND_HOME/snapshots/<名稱>/` |
+| `dnd debug snapshot load <名稱>` | 載回快照；先把目前的資料自動另存成 `before-load-時間` |
+| `dnd debug snapshot list` | 列出快照 |
+| `dnd debug stats` | 重播 events.jsonl，依當地日期列出每天的 XP、commit、AI 回合、倒地、最深樓層、下探層數，最後一行總計與平均每天下探層數 |
+| `dnd debug rebuild` | 從 events.jsonl 重播並覆寫 state.json |
+
+`debug xp`、`debug floor` 寫入的是 `debug_xp`／`debug_floor` 事件，會留在 events.jsonl（日誌開頭標「【除錯】」），重播結果一致。
 
 ## 開發
 
@@ -96,6 +121,7 @@ dnd log              # 冒險日誌
 make test   # go test ./...
 make ci     # gofmt 檢查、go vet、go test -race（commit 前跑）
 go test ./internal/view -update                          # 改了顯示格式後更新 golden 檔
+go test ./cmd/dnd -run DebugStats -update                # 改了 dnd debug stats 的格式後更新 golden 檔
 go test ./internal/adapter/git -run '^$' -fuzz FuzzParse # 模糊測試 git 輸出解析
 ```
 
@@ -108,7 +134,8 @@ cmd/dnd/                 CLI（Cobra），只負責組裝
 content/                 嵌入的 YAML：balance（數值）、species（物種）、logs（日誌模板）、monsters／floors／items（地下城）
 internal/adapter/claude/ Claude Code hook 的 stdin JSON → turn／tool_use 事件（testdata/ 是去識別化樣本）
 internal/adapter/git/    post-commit 時的 git 輸出 → commit 事件（testdata/ 是真實樣本）
-internal/engine/         Apply 與 State；dungeon.go 地下城、capture.go 收服／合體技／圖鑑／隊伍
+internal/clock/          CLI 的「現在」：真實時間 ＋ dnd debug time 的偏移（只在 DND_DEBUG=1 時）
+internal/engine/         Apply 與 State；dungeon.go 地下城、capture.go 收服／合體技／圖鑑／隊伍；debug.go 是 debug_xp／debug_floor
 internal/event/          Event 型別
 internal/home/           DND_HOME 解析
 internal/install/        git post-commit hook 的安裝與移除

@@ -1,8 +1,7 @@
 package main
 
 import (
-	"time"
-
+	"github.com/s0912758806p/commit-dnd/internal/clock"
 	"github.com/s0912758806p/commit-dnd/internal/engine"
 	"github.com/s0912758806p/commit-dnd/internal/event"
 	"github.com/s0912758806p/commit-dnd/internal/view"
@@ -46,7 +45,7 @@ func newPartyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			now := time.Now()
+			now := clock.Now()
 			st = engine.Apply(st, event.Event{At: now, Source: event.SourceTick, Type: "tick"}, pack).State
 			printf(cmd, "%s", view.Party(st, pack, now))
 			return nil
@@ -66,7 +65,7 @@ func newPartyCmd() *cobra.Command {
 					return err
 				}
 				r, err := s.Update(event.Event{
-					At: time.Now(), Source: event.SourceUser, Type: "party",
+					At: clock.Now(), Source: event.SourceUser, Type: "party",
 					Args: map[string]string{"op": op.use, "id": args[0]},
 				})
 				if err != nil {
