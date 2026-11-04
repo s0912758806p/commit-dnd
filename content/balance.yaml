@@ -67,3 +67,11 @@ dungeon:
   item_power_base: 1           # 裝備強度 = 1 + 掉落樓層 ÷ 5 + 0～2 的隨機
   item_power_per_floors: 5
   attack_tools: [Edit, Write, MultiEdit, NotebookEdit]  # 這些工具呼叫一次 = 寵物攻擊一次
+
+party:                         # 迭代 4：收服、合體技與隊伍（隊伍最多 3 隻，寫在引擎裡）
+  capture_base_pct: 40         # fix: commit 時收服眼前一般怪物的機率 = 40% + 40% × 怪物已損失 HP 的比例
+  capture_missing_hp_pct: 40   # （滿血 40%、剩一半 60%、快死近 80%）；Boss 不能收服，倒地中不能收服
+  member_atk_pct: 25           # 每位隊員讓寵物攻擊 + 該怪物在「最深收服樓層」攻擊力的 25%（至少 +1）
+  combo_window_minutes: 30     # commit 前 30 分鐘內有 AI 活動（回合或工具呼叫）就發動合體技
+  combo_base_pct: 200          # 合體技傷害 = 寵物攻擊 × (200% + 50% × 隊員數)，打倒照常掉落
+  combo_per_member_pct: 50
