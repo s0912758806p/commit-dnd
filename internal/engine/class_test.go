@@ -2,6 +2,7 @@ package engine
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -332,5 +333,63 @@ func TestGrowthReplayIsDeterministic(t *testing.T) {
 	// Lv 3 時 test 4 ×200 勝過 feat → 守衛，選了特化「牆」；之後 feat 一路累加，用 Boss 掉的卷軸（2 張）重轉為劍士
 	if p := a.State.Pet; p.Class != "blade" || p.Spec != "" || p.Scrolls != 1 || p.Stage != 3 || p.Mix.Total() != 37 || texts(a) != "重轉劍士" {
 		t.Fatalf("%+v logs=%q", p, texts(a))
+	}
+}
+
+// debug_xp 和 commit 走同一個升級流程（levelUp）：轉職、特化提示、進化都會觸發，HP 回滿到含加成的上限。
+func TestDebugXPGrowsLikeCommit(t *testing.T) {
+	gp := growthPack()
+	xpTo := func(from, to int) int { // 從 Lv from（XP 0）升到 Lv to 需要的 XP
+		n := 0
+		for lv := from; lv < to; lv++ {
+			n += gp.Cost(lv)
+		}
+		return n
+	}
+	cases := []struct {
+		name      string
+		from, to  int
+		class     string
+		stage     int
+		wantLogs  []string
+		forbidden string
+	}{
+		{"Lv 2 → 3：轉職", 2, 3, "shield", 1, []string{"小橘 Lv3", "轉職守衛（守護型）"}, "進化"},
+		{"Lv 3 → 4：進化", 3, 4, "shield", 2, []string{"小橘 Lv4", "進化中史（2）"}, "轉職"},
+		{"Lv 1 → 6：一次跨過所有門檻", 1, 6, "shield", 3, []string{"轉職守衛（守護型）", "進化中史（2）", "可選特化", "進化大史（3）"}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := hatched
+			s.Pet.Level, s.Pet.Stage, s.Pet.XP = tc.from, gp.StageFor(tc.from), 0
+			s.Pet.Mix = mixOf("fix", "fix", "feat")
+			if tc.from >= gp.Growth.JudgeLevel { // 已過判定等級的寵物早就有職業
+				s.Pet.Class = "shield"
+			}
+			e := ev("debug_xp", t0)
+			e.Args = map[string]string{"xp": strconv.Itoa(xpTo(tc.from, tc.to))}
+			r := grun(s, e)
+			p := r.State.Pet
+			if p.Level != tc.to || p.Class != tc.class || p.Stage != tc.stage || p.HP != MaxHP(p, gp) {
+				t.Fatalf("%+v", p)
+			}
+			for _, w := range tc.wantLogs {
+				if !strings.Contains(texts(r), w) {
+					t.Fatalf("缺少 %q: %q", w, texts(r))
+				}
+			}
+			if tc.forbidden != "" && strings.Contains(texts(r), tc.forbidden) {
+				t.Fatalf("不應出現 %q: %q", tc.forbidden, texts(r))
+			}
+		})
+	}
+}
+
+// 轉職卷軸在 defeat() 裡掉落：合體技打倒 Boss 也會掉。
+func TestComboBossKillDropsScroll(t *testing.T) {
+	s := grun(atFloor(3, Monster{ID: "king", HP: 1, MaxHP: 48, Atk: 14}), toolUse(t0, "Read")).State // Read 不攻擊，但算 AI 活動
+	r := grun(s, commitEv(t0, "feat", 0, "a"))
+	if r.State.Party.Combos != 1 || r.State.Dungeon.Warp != 3 || r.State.Pet.Scrolls != 1 || !strings.Contains(texts(r), "打倒 Boss 國王 解鎖 B3 | 卷軸 1/2") {
+		t.Fatalf("combos=%d scrolls=%d logs=%q", r.State.Party.Combos, r.State.Pet.Scrolls, texts(r))
 	}
 }

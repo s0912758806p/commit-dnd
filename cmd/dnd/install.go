@@ -15,6 +15,8 @@ import (
 // `dnd install git [--repo dir]` / `dnd uninstall git`：在 repo 的 post-commit 加入／移除 dnd 區塊。
 // `dnd install claude` / `dnd uninstall claude [--settings path] [--yes]`：編輯 Claude Code 的
 // settings.json（hooks 與 statusLine），寫入前印 diff、確認並備份，細節見 internal/install/claude.go。
+// `dnd install codex` / `dnd uninstall codex [--config path] [--yes]`：編輯 Codex 的 config.toml 的 notify，
+// 流程相同，見 codex.go 與 internal/install/codex.go。
 func newInstallCmd() *cobra.Command {
 	var repo string
 	parent := &cobra.Command{Use: "install", Short: "把 dnd 接進外部工具"}
@@ -40,7 +42,7 @@ func newInstallCmd() *cobra.Command {
 		},
 	}
 	git.Flags().StringVar(&repo, "repo", ".", "repo 路徑")
-	parent.AddCommand(git, newClaudeCmd(true))
+	parent.AddCommand(git, newClaudeCmd(true), newCodexCmd(true))
 	return parent
 }
 
@@ -65,7 +67,7 @@ func newUninstallCmd() *cobra.Command {
 		},
 	}
 	git.Flags().StringVar(&repo, "repo", ".", "repo 路徑")
-	parent.AddCommand(git, newClaudeCmd(false))
+	parent.AddCommand(git, newClaudeCmd(false), newCodexCmd(false))
 	return parent
 }
 

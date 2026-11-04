@@ -1,4 +1,4 @@
-// Package view 把 State 與日誌排成給人看的文字（status、statusline、dungeon、class、sim、log）。只讀資料、不做遊戲判斷：
+// Package view 把 State 與日誌排成給人看的文字（status、statusline、dungeon、class、sim、log；dex、party 在 party.go）。只讀資料、不做遊戲判斷：
 // 呼叫端負責先套用 tick（status 看到的是「現在」的狀態），這裡只負責排版。
 // 輸出格式由 testdata/golden/*.txt 守住，改版面時用 `go test ./internal/view -update` 更新。
 package view
@@ -155,6 +155,7 @@ func Dungeon(s engine.State, c *content.Pack) string {
 	row("防禦", "%d", engine.PetDef(s, c))
 	row("武器", "%s", item(d.Weapon))
 	row("防具", "%s", item(d.Armor))
+	row("隊伍", "%s", partySummary(s, c))
 	row("背包", "未鑑定 %d/%d（commit 一次鑑定一件；倒地會全部遺失）", d.BagN, engine.BagSize)
 	row("戰績", "擊敗 %d、倒地 %d", d.Kills, d.Downs)
 	return b.String()

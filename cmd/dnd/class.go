@@ -1,8 +1,7 @@
 package main
 
 import (
-	"time"
-
+	"github.com/s0912758806p/commit-dnd/internal/clock"
 	"github.com/s0912758806p/commit-dnd/internal/engine"
 	"github.com/s0912758806p/commit-dnd/internal/event"
 	"github.com/s0912758806p/commit-dnd/internal/view"
@@ -26,7 +25,7 @@ func newClassCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			st = engine.Apply(st, event.Event{At: time.Now(), Source: event.SourceTick, Type: "tick"}, pack).State
+			st = engine.Apply(st, event.Event{At: clock.Now(), Source: event.SourceTick, Type: "tick"}, pack).State
 			printf(cmd, "%s", view.Class(st, pack))
 			return nil
 		},
@@ -54,7 +53,7 @@ func classEvent(cmd *cobra.Command, args map[string]string) error {
 	if err != nil {
 		return err
 	}
-	r, err := s.Update(event.Event{At: time.Now(), Source: event.SourceUser, Type: "class", Args: args})
+	r, err := s.Update(event.Event{At: clock.Now(), Source: event.SourceUser, Type: "class", Args: args})
 	if err != nil {
 		return err
 	}

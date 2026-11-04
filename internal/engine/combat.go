@@ -2,11 +2,11 @@ package engine
 
 import "github.com/s0912758806p/commit-dnd/content"
 
-// PetAtk 是寵物的攻擊力：(pet_atk_base + pet_atk_per_level × 等級) × 攻擊加成 + 武器強度。
-// 加成是職業＋特化＋進化（見 class.go 的 Bonus）。
+// PetAtk 是寵物的攻擊力：(pet_atk_base + pet_atk_per_level × 等級) × 攻擊加成 + 武器強度 + 隊伍加成（PartyAtk）。
+// 攻擊加成是職業＋特化＋進化（見 class.go 的 Bonus），只乘在基礎值上；裝備與隊伍加成最後才加。
 func PetAtk(s State, c *content.Pack) int {
 	d := c.Balance.Dungeon
-	return pct(d.PetAtkBase+d.PetAtkPerLevel*s.Pet.Level, 100+Bonus(s.Pet, c).Atk) + s.Dungeon.Weapon.Power
+	return pct(d.PetAtkBase+d.PetAtkPerLevel*s.Pet.Level, 100+Bonus(s.Pet, c).Atk) + s.Dungeon.Weapon.Power + PartyAtk(s, c)
 }
 
 // PetDef 是寵物的防禦力：pet_def_per_level × 等級 × 防禦加成 + 防具強度。

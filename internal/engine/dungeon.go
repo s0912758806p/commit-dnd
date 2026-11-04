@@ -10,6 +10,7 @@ package engine
 //   - commit：倒地中就救起來（同一層、同一隻怪物繼續），並鑑定背包裡最舊的一件，比身上的好才換上。
 //   - warp：只能去入口（0）或已解鎖、不深於 Warp 的 Boss 層，倒地中不能傳送。
 //   - 紮營：在 advance 裡，最後一次活動後閒置滿 camp_after_hours 就回滿 HP（倒地中不會）。
+//   - 遇到怪物時記進圖鑑；收服、合體技與隊伍在 capture.go（迭代 4）。
 //
 // 亂數一律由 splitmix64 產生，種子取自「最後一次 commit hash、樓層、Seq」，同一份 events.jsonl 重播結果相同。
 // AI 只能推進、戰鬥，不能讓寵物回血或解除倒地（DEVPLAN 的鐵律）。
@@ -114,6 +115,7 @@ func spawn(r *Result, e event.Event, c *content.Pack) {
 		rr := rng{seedFor(r.State, e.Seq, "monster")}
 		id = pool[rr.intn(len(pool))]
 	}
+	r.State.Dex.see(id)
 	m, _ := c.MonsterByID(id)
 	scale := 100 + g.GrowthPerFloorPct*(d.Floor-1)
 	hp, atk := pct(m.HP, scale), pct(m.Atk, scale)
@@ -144,6 +146,12 @@ func attack(r *Result, e event.Event, c *content.Pack) {
 	if d.Monster.HP > 0 {
 		return
 	}
+	defeat(r, e, c, m)
+}
+
+// defeat 處理打倒眼前的怪物 m：計數、Boss 解鎖傳送點、掉落一件未鑑定裝備。攻擊與合體技共用。
+func defeat(r *Result, e event.Event, c *content.Pack, m content.Monster) {
+	d := &r.State.Dungeon
 	d.Kills++
 	d.Cleared++
 	if m.Boss {

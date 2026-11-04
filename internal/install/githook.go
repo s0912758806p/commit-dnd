@@ -1,4 +1,4 @@
-// Package install 負責把 dnd 接進外部工具（迭代 1：git post-commit hook）。
+// Package install 負責把 dnd 接進外部工具：git post-commit hook（本檔）、Claude Code 的 settings.json（claude.go）、Codex 的 config.toml（codex.go）。
 //
 // git hook 以標記區塊寫入，安裝與移除都只動區塊本身，不碰使用者原有的內容：
 //

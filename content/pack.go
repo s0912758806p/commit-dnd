@@ -1,7 +1,8 @@
 // Package content 載入嵌入在執行檔裡的 YAML 遊戲內容（content.Pack）。
 //
 // balance.yaml（數值）、species.yaml（物種）、logs.yaml（冒險日誌模板）、
-// monsters.yaml／floors.yaml／items.yaml（地下城）、classes.yaml（職業、特化、進化）
+// monsters.yaml／floors.yaml／items.yaml（地下城；收服、合體技與隊伍的數值與日誌在 balance／logs 的 party 區塊）、
+// classes.yaml（職業、特化、進化）
 // 以 go:embed 編進執行檔，所以調整內容只要重新編譯。XP 曲線在載入時預先算成整數表，
 // 引擎與 State 內不出現浮點。Pack.Hash 是所有內容檔的雜湊，引擎把它寫進 State.ContentHash，
 // 用來偵測「用不同內容重播」造成的差異。測試可以直接組一個 &Pack{...} 注入，不必經過 YAML。
@@ -63,6 +64,7 @@ type Balance struct {
 	Satiety Satiety `yaml:"satiety"`
 	Mood    Mood    `yaml:"mood"`
 	Dungeon Dungeon `yaml:"dungeon"`
+	Party   Party   `yaml:"party"`
 }
 
 type Dungeon struct {
@@ -174,6 +176,7 @@ type Logs struct {
 	NoPet          string              `yaml:"no_pet"`
 	Commit         map[string][]string `yaml:"commit"` // 依 commit 類型；必須有 other
 	Dungeon        DungeonLogs         `yaml:"dungeon"`
+	Party          PartyLogs           `yaml:"party"`
 }
 
 type DungeonLogs struct {
@@ -275,6 +278,9 @@ func (p *Pack) validate() error {
 	}
 
 	if err := p.validateDungeon(); err != nil {
+		return err
+	}
+	if err := p.validateParty(); err != nil {
 		return err
 	}
 	if err := p.validateGrowth(); err != nil {

@@ -2,6 +2,7 @@ package content
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -62,6 +63,20 @@ func TestParseRejects(t *testing.T) {
 		"Boss 間隔為 0": with(func(f *Files) {
 			f.Balance = bytes.Replace(ok.Balance, []byte("boss_every: 10"), []byte("boss_every: 0"), 1)
 		}),
+		"收服機率超過 100": with(func(f *Files) {
+			f.Balance = bytes.Replace(ok.Balance, []byte("capture_base_pct: 40"), []byte("capture_base_pct: 61"), 1)
+		}),
+		"合體技時間窗為 0": with(func(f *Files) {
+			f.Balance = bytes.Replace(ok.Balance, []byte("combo_window_minutes: 30"), []byte("combo_window_minutes: 0"), 1)
+		}),
+		"缺少隊伍日誌": with(func(f *Files) { f.Logs = bytes.Replace(ok.Logs, []byte("  combo: "), []byte("  # combo: "), 1) }),
+		"怪物超過圖鑑容量": with(func(f *Files) {
+			m := bytes.Clone(ok.Monsters)
+			for i := range MaxMonsters {
+				m = fmt.Appendf(m, "- {id: extra%d, name: X%d, element: fire, hp: 1, atk: 1}\n", i, i)
+			}
+			f.Monsters = m
+		}),
 	}
 	for name, f := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -102,5 +117,14 @@ func TestSpeciesAliases(t *testing.T) {
 	}
 	if _, ok := p.SpeciesByID("slime"); ok {
 		t.Fatal("slime 已移除")
+	}
+}
+
+// docs/DESIGN-NOTES.md 第 36–38 條寫死的收服、隊伍、合體技數值綁住 balance.yaml。
+func TestPartyMatchesDesignNotes(t *testing.T) {
+	p, _ := Default()
+	want := Party{CaptureBasePct: 40, CaptureMissingHPPct: 40, MemberAtkPct: 25, ComboWindowMinutes: 30, ComboBasePct: 200, ComboPerMemberPct: 50}
+	if p.Balance.Party != want {
+		t.Fatalf("balance.yaml 的 party 改了，請同步 DESIGN-NOTES 第 36–38 條: %+v", p.Balance.Party)
 	}
 }

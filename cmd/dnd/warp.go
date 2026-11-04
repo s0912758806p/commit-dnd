@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"strconv"
-	"time"
 
+	"github.com/s0912758806p/commit-dnd/internal/clock"
 	"github.com/s0912758806p/commit-dnd/internal/event"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +26,7 @@ func newWarpCmd() *cobra.Command {
 				return err
 			}
 			r, err := s.Update(event.Event{
-				At: time.Now(), Source: event.SourceUser, Type: "warp",
+				At: clock.Now(), Source: event.SourceUser, Type: "warp",
 				Args: map[string]string{"floor": strconv.Itoa(floor)},
 			})
 			if err != nil {

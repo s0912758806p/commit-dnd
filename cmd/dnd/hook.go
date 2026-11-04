@@ -12,11 +12,13 @@ import (
 
 	claudeadapter "github.com/s0912758806p/commit-dnd/internal/adapter/claude"
 	gitadapter "github.com/s0912758806p/commit-dnd/internal/adapter/git"
+	"github.com/s0912758806p/commit-dnd/internal/clock"
 	"github.com/s0912758806p/commit-dnd/internal/home"
 	"github.com/spf13/cobra"
 )
 
-// `dnd hook git`（post-commit）與 `dnd hook claude`（Claude Code hook）：隱藏指令，不輸出任何東西、永遠 exit 0。
+// `dnd hook git`（post-commit）、`dnd hook claude`（Claude Code hook）與 `dnd hook codex`（Codex notify，見 codex.go）：
+// 隱藏指令，不輸出任何東西、永遠 exit 0。
 func newHookCmd() *cobra.Command {
 	hook := &cobra.Command{Use: "hook", Short: "給外部工具呼叫的 hook", Hidden: true}
 	hook.AddCommand(&cobra.Command{
@@ -33,6 +35,7 @@ func newHookCmd() *cobra.Command {
 			runHook("claude", func() error { return hookClaude(cmd.InOrStdin()) })
 		},
 	})
+	hook.AddCommand(newHookCodexCmd())
 	return hook
 }
 
@@ -42,7 +45,7 @@ func hookClaude(stdin io.Reader) error {
 		return err
 	}
 	captureClaude(raw)
-	events, err := claudeadapter.Adapter{}.Parse(raw, time.Now())
+	events, err := claudeadapter.Adapter{}.Parse(raw, clock.Now())
 	if err != nil || len(events) == 0 {
 		return err
 	}
@@ -96,7 +99,7 @@ func hookGit() error {
 	if err != nil {
 		return err
 	}
-	events, err := gitadapter.Adapter{Repo: filepath.Base(wd)}.Parse(out, time.Now())
+	events, err := gitadapter.Adapter{Repo: filepath.Base(wd)}.Parse(out, clock.Now())
 	if err != nil || len(events) == 0 {
 		return err
 	}

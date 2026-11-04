@@ -48,3 +48,14 @@ dungeon:
   warp: "{name} 透過傳送點來到 B{floor}。"
   warp_entrance: "{name} 回到了地城入口。"
   warp_denied: "無法傳送到 B{floor}：{reason}。"
+
+# party 區塊（迭代 4）另有：{party}／{party_max} 隊伍人數、{dmg} 合體技傷害、{reason} 原因。
+party:
+  capture: "{name} 趁著修好陷阱的空檔，收服了 {monster}！"
+  capture_fail: "{name} 想收服 {monster}，可惜被牠掙脫了。"
+  capture_boss: "{monster} 是 Boss，收服不了。"
+  join: "{monster} 加入了隊伍（{party}/{party_max}）。"
+  full: "隊伍滿了，{monster} 先記在圖鑑裡（dnd party 可以調整）。"
+  combo: "{name} 和 AI 夥伴使出合體技，對 {monster} 造成 {dmg} 點傷害！"
+  remove: "{monster} 離開了隊伍（{party}/{party_max}）。"
+  denied: "無法調整隊伍：{reason}。"
