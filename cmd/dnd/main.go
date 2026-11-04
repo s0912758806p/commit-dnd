@@ -2,7 +2,7 @@
 // 或讀 State → view 排版。遊戲判斷全部在 internal/engine。
 //
 // hook 子指令由 git 等外部工具呼叫，任何錯誤都寫進 $DND_HOME/errors.log 後以 exit 0 結束，
-// 不能卡住使用者的 commit。debug 子指令只在 DND_DEBUG=1 時註冊。
+// 不能卡住使用者的 commit。debug 子指令只在 DND_DEBUG=1 時註冊。sim 只讀 git log、在記憶體跑引擎，不讀寫 $DND_HOME。
 package main
 
 import (
@@ -27,7 +27,7 @@ func newRoot() *cobra.Command {
 		Short:        "Dungeons & Diffs：用 commit 與 AI 工作養寵物、闖地下城",
 		SilenceUsage: true,
 	}
-	root.AddCommand(newHatchCmd(), newStatusCmd(), newDungeonCmd(), newWarpCmd(), newDexCmd(), newPartyCmd(), newLogCmd(), newStatuslineCmd(), newDoctorCmd(), newInstallCmd(), newUninstallCmd(), newHookCmd(), newEventCmd())
+	root.AddCommand(newHatchCmd(), newStatusCmd(), newDungeonCmd(), newWarpCmd(), newDexCmd(), newPartyCmd(), newClassCmd(), newSimCmd(), newLogCmd(), newStatuslineCmd(), newDoctorCmd(), newInstallCmd(), newUninstallCmd(), newHookCmd(), newEventCmd())
 	if os.Getenv("DND_DEBUG") == "1" {
 		root.AddCommand(newDebugCmd())
 	}

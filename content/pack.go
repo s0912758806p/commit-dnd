@@ -1,9 +1,10 @@
 // Package content 載入嵌入在執行檔裡的 YAML 遊戲內容（content.Pack）。
 //
 // balance.yaml（數值）、species.yaml（物種）、logs.yaml（冒險日誌模板）、
-// monsters.yaml／floors.yaml／items.yaml（地下城；收服、合體技與隊伍的數值與日誌在 balance／logs 的 party 區塊）
+// monsters.yaml／floors.yaml／items.yaml（地下城；收服、合體技與隊伍的數值與日誌在 balance／logs 的 party 區塊）、
+// classes.yaml（職業、特化、進化）
 // 以 go:embed 編進執行檔，所以調整內容只要重新編譯。XP 曲線在載入時預先算成整數表，
-// 引擎與 State 內不出現浮點。Pack.Hash 是三個檔案的雜湊，引擎把它寫進 State.ContentHash，
+// 引擎與 State 內不出現浮點。Pack.Hash 是所有內容檔的雜湊，引擎把它寫進 State.ContentHash，
 // 用來偵測「用不同內容重播」造成的差異。測試可以直接組一個 &Pack{...} 注入，不必經過 YAML。
 package content
 
@@ -33,11 +34,13 @@ var (
 	floorsYAML []byte
 	//go:embed items.yaml
 	itemsYAML []byte
+	//go:embed classes.yaml
+	classesYAML []byte
 )
 
 // Files 是 Pack 的原始 YAML；Parse 的輸入。
 type Files struct {
-	Balance, Species, Logs, Monsters, Floors, Items []byte
+	Balance, Species, Logs, Monsters, Floors, Items, Classes []byte
 }
 
 type Pack struct {
@@ -47,6 +50,7 @@ type Pack struct {
 	Monsters []Monster
 	Floors   Floors
 	Items    Items
+	Growth   Growth // classes.yaml
 	// XPTable[n] 是從 Lv n 升到 n+1 需要的 XP；索引 0 不使用，長度為 max_level。
 	XPTable []int
 	Hash    string // sha256 前 12 碼
@@ -207,6 +211,7 @@ func Parse(f Files) (*Pack, error) {
 		{"monsters.yaml", f.Monsters, &p.Monsters},
 		{"floors.yaml", f.Floors, &p.Floors},
 		{"items.yaml", f.Items, &p.Items},
+		{"classes.yaml", f.Classes, &p.Growth},
 	} {
 		dec := yaml.NewDecoder(bytes.NewReader(d.src))
 		dec.KnownFields(true)
@@ -221,7 +226,7 @@ func Parse(f Files) (*Pack, error) {
 	p.XPTable = XPTable(x.CurveBase, x.CurveExp, x.MaxLevel)
 
 	h := sha256.New()
-	for _, b := range [][]byte{f.Balance, f.Species, f.Logs, f.Monsters, f.Floors, f.Items} {
+	for _, b := range [][]byte{f.Balance, f.Species, f.Logs, f.Monsters, f.Floors, f.Items, f.Classes} {
 		h.Write(b)
 		h.Write([]byte{0})
 	}
@@ -278,6 +283,9 @@ func (p *Pack) validate() error {
 	if err := p.validateParty(); err != nil {
 		return err
 	}
+	if err := p.validateGrowth(); err != nil {
+		return err
+	}
 
 	if len(p.Logs.Commit["other"]) == 0 {
 		return fmt.Errorf("logs.yaml: commit 必須有 other")
@@ -329,7 +337,7 @@ func Default() (*Pack, error) { return defaultPack() }
 
 // Embedded 回傳嵌入的原始 YAML，給測試改寫其中一個檔案用。
 func Embedded() Files {
-	return Files{Balance: balanceYAML, Species: speciesYAML, Logs: logsYAML, Monsters: monstersYAML, Floors: floorsYAML, Items: itemsYAML}
+	return Files{Balance: balanceYAML, Species: speciesYAML, Logs: logsYAML, Monsters: monstersYAML, Floors: floorsYAML, Items: itemsYAML, Classes: classesYAML}
 }
 
 func (p *Pack) validateDungeon() error {

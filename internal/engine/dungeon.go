@@ -6,7 +6,7 @@ package engine
 //     （滿 encounters_per_floor 隻，或打倒 Boss）就往下探一層（Boss 層只有 Boss）；
 //     有怪物就被攻擊扣 HP，HP 歸零即倒地並遺失所有未鑑定裝備。
 //   - 攻擊工具（Edit、Write…）的 tool_use：寵物攻擊這層的怪物；打倒後掉一件未鑑定裝備，
-//     打倒 Boss 則解鎖該層傳送點。
+//     打倒 Boss 則解鎖該層傳送點，並有機率掉落轉職卷軸（見 class.go）。
 //   - commit：倒地中就救起來（同一層、同一隻怪物繼續），並鑑定背包裡最舊的一件，比身上的好才換上。
 //   - warp：只能去入口（0）或已解鎖、不深於 Warp 的 Boss 層，倒地中不能傳送。
 //   - 紮營：在 advance 裡，最後一次活動後閒置滿 camp_after_hours 就回滿 HP（倒地中不會）。
@@ -158,6 +158,7 @@ func defeat(r *Result, e event.Event, c *content.Pack, m content.Monster) {
 		d.Cleared = c.Balance.Dungeon.EncountersPerFloor
 		d.Warp = max(d.Warp, d.Floor)
 		r.dlog(e.At, c, c.Logs.Dungeon.BossKill, nil)
+		dropScroll(r, e, c)
 	} else {
 		r.dlog(e.At, c, c.Logs.Dungeon.Kill, nil)
 	}
@@ -180,7 +181,7 @@ func rescue(r *Result, e event.Event, c *content.Pack) {
 	}
 	d.Downed = false
 	p := &r.State.Pet
-	p.HP = max(1, pct(c.MaxHP(p.Level), c.Balance.Dungeon.RescueHPPct))
+	p.HP = max(1, pct(MaxHP(*p, c), c.Balance.Dungeon.RescueHPPct))
 	r.dlog(e.At, c, c.Logs.Dungeon.Rescue, nil)
 	r.Fx = append(r.Fx, EffectRescue)
 }

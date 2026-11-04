@@ -4,12 +4,13 @@
 // 這是重播、模擬與 Rebuild 的基礎。每次 Apply 先依 e.At − s.UpdatedAt 推進時間效果
 // （Δ < 0 時視為 0、UpdatedAt 只前進；孵蛋前沒有時間效果），再依 e.Type 分派：
 //
-//   - hatch：Args 的 species／name 孵出寵物；已有寵物或物種不存在時不變
-//   - commit：依類型與行數給 XP；當地每天前幾筆乘上補給倍率，飽足過低減半；同時餵食、回血、升級。
-//     與上一筆計分的 commit 同 hash 時不計分（hook 重跑、重複安裝）
+//   - hatch：Args 的 species／name 孵出寵物，mix 是初始的 commit 組成；已有寵物或物種不存在時不變
+//   - commit：依類型與行數給 XP；當地每天前幾筆乘上補給倍率，飽足過低減半；同時餵食、回血、累加 commit 組成、
+//     升級（升級時轉職、進化，見 class.go）。與上一筆計分的 commit 同 hash 時不計分（hook 重跑、重複安裝）
 //   - pet：心情上升
 //   - turn／tool_use：計數 AI 回合與工具呼叫（孵蛋前也計數）；孵蛋後推進地下城（見 dungeon.go）
 //   - warp：使用者的傳送指令（見 dungeon.go）
+//   - class：使用者選擇特化或使用轉職卷軸（見 class.go）
 //   - party：使用者調整隊伍（見 capture.go）
 //   - debug_xp／debug_floor：`dnd debug xp`／`dnd debug floor` 寫入的除錯事件（見 debug.go）
 //   - 其他類型（含 tick）：只推進時間
@@ -92,6 +93,12 @@ func Apply(s State, e event.Event, c *content.Pack) Result {
 		} else {
 			r.log(e.At, c, c.Logs.NoPet, nil)
 		}
+	case "class":
+		if r.State.Pet.Hatched() {
+			classCmd(&r, e, c)
+		} else {
+			r.log(e.At, c, c.Logs.NoPet, nil)
+		}
 	case "party":
 		if r.State.Pet.Hatched() {
 			partyCmd(&r, e, c)
@@ -136,7 +143,7 @@ func advance(s State, at time.Time, c *content.Pack) (_ State, camped bool) {
 	if d.Downed {
 		return s, false
 	}
-	maxHP := c.MaxHP(p.Level)
+	maxHP := MaxHP(*p, c)
 	p.HP = fill(p.HP, n, b.HP.RegenAmount, maxHP)
 	idle := time.Duration(b.Dungeon.CampAfterHours) * time.Hour
 	if !d.LastActive.IsZero() && at.Sub(d.LastActive) >= idle && p.HP < maxHP {
@@ -185,9 +192,10 @@ func hatch(r *Result, e event.Event, c *content.Pack) {
 	}
 	b := c.Balance
 	r.State.Pet = Pet{
-		Species: sp.ID, Name: name, Stage: 1, Level: 1, HP: c.MaxHP(1),
-		Satiety: b.Satiety.Start, Mood: b.Mood.Start,
+		Species: sp.ID, Name: name, Stage: 1, Level: 1,
+		Satiety: b.Satiety.Start, Mood: b.Mood.Start, Mix: ParseMix(e.Args["mix"]),
 	}
+	r.State.Pet.HP = MaxHP(r.State.Pet, c)
 	r.log(e.At, c, c.Logs.Hatch, nil)
 	r.Fx = append(r.Fx, EffectHatch)
 }
@@ -230,8 +238,9 @@ func commit(r *Result, e event.Event, c *content.Pack) {
 	}
 
 	p.Commits++
+	p.Mix.Add(ci.Kind)
 	p.Satiety = min(b.Satiety.Max, p.Satiety+b.Commit.Feed)
-	p.HP = min(c.MaxHP(p.Level), p.HP+b.Commit.Heal)
+	p.HP = min(MaxHP(*p, c), p.HP+b.Commit.Heal)
 	p.XP += xp
 
 	tmpls, ok := c.Logs.Commit[kind]
@@ -251,9 +260,10 @@ func levelUp(r *Result, e event.Event, c *content.Pack) {
 	for cost := c.Cost(p.Level); cost > 0 && p.XP >= cost; cost = c.Cost(p.Level) {
 		p.XP -= cost
 		p.Level++
-		p.HP = c.MaxHP(p.Level)
 		r.log(e.At, c, c.Logs.Levelup, nil)
 		r.Fx = append(r.Fx, EffectLevelUp)
+		grow(r, e, c)
+		p.HP = MaxHP(*p, c)
 	}
 }
 

@@ -14,9 +14,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// `dnd hatch [--species id] [--name 名字]`：沒給參數時互動詢問（stdin 不是終端機時要求用參數）。
+// `dnd hatch [--species id] [--name 名字] [--repo .]`：沒給參數時互動詢問（stdin 不是終端機時要求用參數）。
+// 孵蛋時讀 --repo 過去 90 天的 git log 建立 commit 組成，寫進 hatch 事件的 mix 參數（見 sim.go 的 hatchMix）。
 func newHatchCmd() *cobra.Command {
-	var species, name string
+	var species, name, repo string
 	cmd := &cobra.Command{
 		Use:   "hatch",
 		Short: "孵出你的寵物（選物種、取名）",
@@ -52,9 +53,11 @@ func newHatchCmd() *cobra.Command {
 				return fmt.Errorf("沒有物種 %q（%s）", species, speciesIDs(pack))
 			}
 
+			now := clock.Now()
+			mix, note := hatchMix(repo, now)
 			r, err := s.Update(event.Event{
-				At: clock.Now(), Source: event.SourceUser, Type: "hatch",
-				Args: map[string]string{"species": species, "name": name},
+				At: now, Source: event.SourceUser, Type: "hatch",
+				Args: map[string]string{"species": species, "name": name, "mix": mix},
 			})
 			if err != nil {
 				return err
@@ -62,12 +65,14 @@ func newHatchCmd() *cobra.Command {
 			for _, l := range r.Logs {
 				printf(cmd, "%s\n", l.Text)
 			}
+			printf(cmd, "%s\n", note)
 			printf(cmd, "接下來在 repo 裡執行 dnd install git，commit 就會讓牠成長。\n")
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&species, "species", "", "物種 id")
 	cmd.Flags().StringVar(&name, "name", "", "寵物名字（預設為物種名）")
+	cmd.Flags().StringVar(&repo, "repo", ".", "讀這個 repo 過去 90 天的 commit 建立 commit 組成")
 	return cmd
 }
 
