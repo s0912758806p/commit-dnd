@@ -8,7 +8,7 @@ DEVPLAN（2026-10-30）之外、實作時定下的決定。每條註明在哪一
    改為 `store.Update(e)`：取鎖 → 讀 state → 指派 Seq → `engine.Apply` → 追加 events.jsonl → 原子寫 state.json → 放鎖。
    取鎖逾時 `store.DefaultLockTimeout`（50 ms）回傳 `ErrBusy`，由呼叫端決定是否靜默放棄。
 2. **Event 新增欄位**：`V`（事件格式版本）、`Seq`（store 在鎖內指派，連續遞增）、`Args map[string]string`（hatch 物種、warp 樓層、debug 數值等參數）。
-3. **亂數種子**（迭代 3 實作）：`hash(最後一次 commit hash, 樓層, Seq)`，讓沒有 commit hash 的 AI 回合也有確定的種子。
+3. **亂數種子**（迭代 3 實作，見第 28 條）：`hash(最後一次 commit hash, 樓層, Seq)`，讓沒有 commit hash 的 AI 回合也有確定的種子。
 4. **tick 不落地，衰減必須路徑無關**：status／statusline 只在記憶體套用 tick。衰減以「累積未滿一週期的時間」（`Pet.*Carry`）實作，
    一次推進 Δ1+Δ2 與分兩次結果完全相同；`engine.TestTimeEffectsArePathIndependent` 守住這條。之後新增的任何時間效果都要加進這個測試。
 5. **時間倒流**：`e.At < UpdatedAt` 時 Δ 視為 0，`UpdatedAt` 只前進。`debug time` 的偏移存在 `DND_HOME`，由 adapter 的 `now` 統一加上（尚未實作，見待決）。
@@ -63,6 +63,31 @@ DEVPLAN（2026-10-30）之外、實作時定下的決定。每條註明在哪一
     因為 Claude Code 只顯示 exit 0 的輸出。
 25. **AI 事件量**：每次工具呼叫都寫一行事件，一天幾百行。`dnd status`／`statusline` 只讀 state.json 不受影響；
     `dnd log` 每次全量重播，若一年後變慢，再考慮定期快照。
+
+## 已採用（迭代 3）
+
+26. **地下城的核心流程**（規則在 `internal/engine/dungeon.go`）：
+    - AI 回合（Stop）：眼前沒怪物時遇到下一隻，這層打完 `encounters_per_floor` 隻（或打倒 Boss）才往下探；有怪物就被攻擊。
+    - 攻擊工具（Edit、Write、MultiEdit、NotebookEdit）呼叫一次＝寵物攻擊一次。真實使用時一個回合的工具呼叫先發生、Stop 最後，
+      所以寵物先出手，回合結束時才輪到怪物。
+    - 每 10 層一隻 Boss，打倒後解鎖該層傳送點；`warp` 只能去入口或已解鎖、不深於最深傳送點的 Boss 層。
+    - 屬性：火剋草、草剋水、水剋火；相剋 ×1.5、被剋 ×0.7，武器影響造成的傷害、防具影響受到的傷害。
+    - commit：先救起倒地的寵物（同一層、同一隻怪物，HP 50%），最後鑑定背包裡最舊的一件，比身上同種類的強才換上。
+    - 倒地中 AI 不能推進、攻擊，HP 也不會自然回復或紮營；只有 commit 能救（DEVPLAN 的鐵律：AI 不能單獨回血或免除倒地）。
+27. **使用者的三個決定**（2026-11-04）：打倒怪物不給經驗、只掉裝備（經驗只來自 commit）；倒地時失去所有未鑑定的裝備；
+    最後一次 commit／AI 活動後閒置滿 8 小時就紮營，HP 回滿。
+28. **亂數**：第 3 條的種子設計在此實作。用 splitmix64（自己實作，不依賴標準庫演算法版本），種子是
+    「最後一次 commit hash、樓層、Seq、用途」的 FNV 雜湊；掉落物把種子存在背包裡，鑑定時才展開，重播結果不變。
+29. **State 仍保持可比較**：未鑑定背包用固定大小陣列（`BagSize` = 10），滿了之後新的掉落物留在原地。
+30. **數值以模擬調整**（2026-11-04 快照，正式內容、每回合 2 次編輯）：每層 6 隻、怪物每層成長 10%、Boss ×2。
+
+    | 玩法 | 第 1 天 | 第 8 天 | 第 30 天 | 每天倒地 |
+    | --- | --- | --- | --- | --- |
+    | 每天 8 commit、40 回合 | B7 | B44 | B116、Lv 26 | 前 10 天 0 次，之後 1–3 次 |
+    | 每天 3 commit、80 回合 | B13 | B51 | B105、Lv 21 | 2–4 次 |
+    | 只用 AI、不 commit | 第 1 天在 B10 倒地 | — | 一直倒地 | — |
+
+    第一版每層 1 隻、成長 8% 時，第 1 天就到 B26、兩週 B169，樓層數字失去意義，因此改成上面的數值。
 
 ## 待決
 

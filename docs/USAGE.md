@@ -2,7 +2,7 @@
 
 這個專案是什麼，見 [README](../README.md)。
 
-目前進度：**迭代 2（Claude Code 整合）**——孵蛋、commit 給經驗與升級、每日補給、飽足／心情／HP 隨時間變化、冒險日誌；Claude Code 的 AI 回合會被記錄並顯示在 statusline。
+目前進度：**迭代 3（無盡地下城）**——孵蛋、commit 給經驗與升級、每日補給、飽足／心情／HP 隨時間變化、冒險日誌；Claude Code 的 AI 回合帶寵物闖地下城，commit 救援與鑑定裝備。
 
 ## 安裝
 
@@ -31,6 +31,14 @@ dnd log              # 冒險日誌
 - **飽足**：每小時下降，commit 會餵食；太餓時 commit 的經驗減半。
 - **心情**：每小時下降，`dnd event user pet` 可以摸摸牠。
 - amend、cherry-pick、rebase 不會重複計分；數值都在 `content/balance.yaml`。
+
+**無盡地下城**（接上 Claude Code 之後）：
+- Claude 的每個回合，寵物會遇到下一隻怪物或被眼前的怪物攻擊；Claude 改檔案（Edit、Write）時，寵物會出手攻擊。
+- 每層打倒 6 隻往下一層；每 10 層有 Boss，打倒後可以用 `dnd warp <樓層>` 傳送回來。
+- 打倒怪物會掉「未鑑定」的裝備；每次 commit 鑑定一件，比身上的強才換上。
+- HP 歸零就倒地：未鑑定的裝備全部遺失，AI 也不能再帶牠前進或回血，**下一次 commit 會把牠救起來**，在同一層繼續。
+- 閒置 8 小時（下班、睡覺）會紮營，HP 回滿。
+- 屬性：火剋草、草剋水、水剋火。怪物、樓層、裝備定義在 `content/monsters.yaml`、`floors.yaml`、`items.yaml`。
 
 **接上 Claude Code**：執行 `dnd install claude`，確認差異後寫入。Claude Code 會自動重新載入設定，不需要重啟；底部 statusline 會顯示寵物與今日 AI 回合。設定檔位置依序為 `--settings`、`$CLAUDE_CONFIG_DIR/settings.json`、`~/.claude/settings.json`。
 
