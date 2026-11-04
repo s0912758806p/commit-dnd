@@ -2,7 +2,7 @@
 
 這個專案是什麼，見 [README](../README.md)。
 
-目前進度：**迭代 1（寵物與 git）**——孵蛋、commit 給經驗與升級、每日補給、飽足／心情／HP 隨時間變化、冒險日誌。
+目前進度：**迭代 2（Claude Code 整合）**——孵蛋、commit 給經驗與升級、每日補給、飽足／心情／HP 隨時間變化、冒險日誌；Claude Code 的 AI 回合會被記錄並顯示在 statusline。
 
 ## 安裝
 
@@ -39,12 +39,18 @@ dnd log              # 冒險日誌
 | `dnd hatch [--species id] [--name 名字]` | 孵出寵物；沒給參數時互動詢問 |
 | `dnd status` | 寵物現在的狀態（不寫檔） |
 | `dnd log [-n 20]` | 最近的冒險日誌（`-n 0` 顯示全部） |
+| `dnd statusline` | Claude Code 底部的一行（等級、XP、HP、飽足、補給、今日 AI 回合）；不寫檔、永遠成功 |
+| `dnd doctor [--repo .] [--settings 路徑]` | 檢查資料、寵物、hook 錯誤紀錄、git hook 與 Claude Code 設定；只讀，有問題時 exit 1 |
 | `dnd install git [--repo .]` | 在 repo 的 post-commit 加入 dnd；已有 hook 時只插入標記區塊 |
 | `dnd uninstall git [--repo .]` | 移除 dnd 區塊；檔案只剩 shebang 時整個刪除 |
 | `dnd event <source> <type> [key=value...]` | 手動寫入一個事件（開發用）。source：`git`、`claude`、`codex`、`user`、`tick` |
 | `dnd debug rebuild` | 從 events.jsonl 重播並覆寫 state.json；只在 `DND_DEBUG=1` 時出現 |
 
-`dnd hook git` 是給 post-commit 呼叫的隱藏指令：不輸出、永遠成功，錯誤寫進 `$DND_HOME/errors.log`。
+`dnd hook git`（post-commit）與 `dnd hook claude`（Claude Code 的 PostToolUse／Stop）是隱藏指令：不輸出、永遠成功，錯誤寫進 `$DND_HOME/errors.log`。
+
+**Claude Code 的 AI 活動**：每個 AI 回合（Stop）與工具呼叫（PostToolUse）都會被記錄。迭代 2 只計數、不影響寵物；AI 不能幫寵物回血或給經驗。從迭代 3 起，AI 回合會推進地下城。
+
+**statusline 串接**：安裝前若已有自己的 statusLine，原本的設定會存到 `$DND_HOME/claude/original-statusline.json`。`dnd statusline` 會先用同一份輸入執行它，再把寵物資訊接在同一行後面；`dnd uninstall claude` 時還原。
 
 ## 資料位置
 
@@ -52,7 +58,9 @@ dnd log              # 冒險日誌
 | --- | --- |
 | `$DND_HOME/events.jsonl` | 唯一的事實來源，每行一個事件，只追加 |
 | `$DND_HOME/state.json` | 最新狀態的快取，可以刪掉，用 `dnd debug rebuild` 重建 |
-| `$DND_HOME/errors.log` | hook 失敗的紀錄（hook 本身不會讓 commit 失敗） |
+| `$DND_HOME/errors.log` | hook 失敗的紀錄（hook 本身不會讓 commit 或 Claude Code 失敗） |
+| `$DND_HOME/claude/original-statusline.json` | 安裝前原本的 Claude Code statusLine（有才會存在） |
+| `$DND_HOME/capture/claude/` | 手動建立這個目錄時，`dnd hook claude` 會把收到的原始 JSON 存在這裡（收集測試樣本用） |
 | `$DND_HOME/lock` | 寫入用的檔案鎖 |
 
 `DND_HOME` 未設定時為 `~/.dnd`。**開發測試一律用 `DND_HOME=./tmp/dnd`**（`tmp/` 已在 `.gitignore`），避免弄壞正式遊玩的寵物。
@@ -73,6 +81,7 @@ GitHub Actions（`.github/workflows/ci.yml`）在每個 PR 與 push 到 `main` �
 ```
 cmd/dnd/                 CLI（Cobra），只負責組裝
 content/                 嵌入的 YAML：balance（數值）、species（物種）、logs（日誌模板）
+internal/adapter/claude/ Claude Code hook 的 stdin JSON → turn／tool_use 事件（testdata/ 是去識別化樣本）
 internal/adapter/git/    post-commit 時的 git 輸出 → commit 事件（testdata/ 是真實樣本）
 internal/engine/         Apply 與 State
 internal/event/          Event 型別
@@ -92,3 +101,11 @@ docs/hero.svg            README 的主視覺
 | --- | --- | --- | --- |
 | `dnd status` | < 20 ms | 3.4 ms | 4.3 ms |
 | `dnd hook git` | < 100 ms | 18.3 ms | 20.4 ms（其中 `git log` 約 10 ms） |
+
+2026-11-04，同一台機器，未安裝 hyperfine，用 Python 各跑 50 次（量測時另一個 session 正在平行編譯與測試）：
+
+| 指令 | 目標 | 平均 | p95 |
+| --- | --- | --- | --- |
+| `dnd hook claude`（PostToolUse） | < 100 ms | 23.7 ms | 49.5 ms |
+| `dnd hook claude`（Stop） | < 100 ms | 21.6 ms | 40.3 ms |
+| `dnd statusline`（未串接） | — | 11.1 ms | 20.8 ms |
