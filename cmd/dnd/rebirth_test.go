@@ -9,6 +9,9 @@ import (
 func TestRebirthFlow(t *testing.T) {
 	t.Setenv("DND_HOME", t.TempDir())
 	t.Setenv("DND_DEBUG", "1")
+	// hatch 會讀目前資料夾的 git log 建立 commit 組成；在空資料夾執行，職業才不受所在 repo 的歷史影響
+	// （CI 的淺層 clone 只有一筆 PR 合併 commit，會被算成 other 而判定為冒險者）。
+	t.Chdir(t.TempDir())
 	run := func(args ...string) string {
 		t.Helper()
 		out, err := dnd(t, args...)
@@ -23,7 +26,9 @@ func TestRebirthFlow(t *testing.T) {
 	}
 	for life := 1; life <= 2; life++ {
 		run("debug", "xp", "5000")
-		run("class", "choose", "marksman") // 沒有 commit 組成時判定為清單第一個職業（遊俠）
+		if out := run("class", "choose", "marksman"); !strings.Contains(out, "選擇了特化") { // 沒有 commit 組成時判定為清單第一個職業（遊俠）
+			t.Fatalf("第 %d 輪選特化失敗:\n%s", life, out)
+		}
 		out := run("debug", "xp", "50000")
 		if !strings.Contains(out, "破曉射手") {
 			t.Fatalf("第 %d 輪應取得終職:\n%s", life, out)
