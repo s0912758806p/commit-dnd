@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/s0912758806p/commit-dnd/internal/clock"
 	"github.com/s0912758806p/commit-dnd/internal/engine"
 	"github.com/s0912758806p/commit-dnd/internal/event"
 	"github.com/s0912758806p/commit-dnd/internal/home"
@@ -54,7 +55,7 @@ func petLine() string {
 	if err != nil {
 		return "dnd：讀取失敗（dnd doctor）"
 	}
-	now := time.Now()
+	now := clock.Now()
 	st = engine.Apply(st, event.Event{At: now, Source: event.SourceTick, Type: "tick"}, pack).State
 	return view.Statusline(st, pack, now)
 }

@@ -12,6 +12,7 @@ import (
 
 	claudeadapter "github.com/s0912758806p/commit-dnd/internal/adapter/claude"
 	gitadapter "github.com/s0912758806p/commit-dnd/internal/adapter/git"
+	"github.com/s0912758806p/commit-dnd/internal/clock"
 	"github.com/s0912758806p/commit-dnd/internal/home"
 	"github.com/spf13/cobra"
 )
@@ -42,7 +43,7 @@ func hookClaude(stdin io.Reader) error {
 		return err
 	}
 	captureClaude(raw)
-	events, err := claudeadapter.Adapter{}.Parse(raw, time.Now())
+	events, err := claudeadapter.Adapter{}.Parse(raw, clock.Now())
 	if err != nil || len(events) == 0 {
 		return err
 	}
@@ -96,7 +97,7 @@ func hookGit() error {
 	if err != nil {
 		return err
 	}
-	events, err := gitadapter.Adapter{Repo: filepath.Base(wd)}.Parse(out, time.Now())
+	events, err := gitadapter.Adapter{Repo: filepath.Base(wd)}.Parse(out, clock.Now())
 	if err != nil || len(events) == 0 {
 		return err
 	}

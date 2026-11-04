@@ -28,6 +28,7 @@ func newDoctorCmd() *cobra.Command {
 			d := &doctor{cmd: cmd}
 			d.binary()
 			d.data()
+			d.debugTime()
 			d.gitHook(repo)
 			d.claude(settings)
 			if d.failed > 0 {
