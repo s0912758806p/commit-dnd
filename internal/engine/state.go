@@ -28,7 +28,8 @@ type Dungeon struct {
 	Deepest int     `json:"deepest"` // 到過最深的樓層
 	Warp    int     `json:"warp"`    // 已解鎖最深的傳送點（打倒過 Boss 的樓層）；0 表示沒有
 	Downed  bool    `json:"downed"`  // 倒地中：AI 回合不再推進，等 commit 救援
-	Monster Monster `json:"monster"` // 這層的怪物；ID 為空表示沒有（下個 AI 回合往下探）
+	Monster Monster `json:"monster"` // 眼前的怪物；ID 為空表示沒有（下個 AI 回合遇到下一隻或往下探）
+	Cleared int     `json:"cleared"` // 這層已打倒幾隻；滿 encounters_per_floor（或打倒 Boss）才往下探
 	Weapon  Item    `json:"weapon"`  // 裝備中的武器；Name 為空表示沒有
 	Armor   Item    `json:"armor"`
 	// Bag 是未鑑定的掉落物，前 BagN 個有效（舊到新）。commit 鑑定最舊的一件；倒地時全部遺失。

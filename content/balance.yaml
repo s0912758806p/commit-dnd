@@ -53,7 +53,8 @@ mood:
   decay_amount: 10
 
 dungeon:
-  growth_per_floor_pct: 8      # 怪物 HP、攻擊每往下一層 +8%（線性，第 1 層為 100%）
+  growth_per_floor_pct: 10     # 怪物 HP、攻擊每往下一層 +10%（線性，第 1 層為 100%）
+  encounters_per_floor: 6      # 每層要打倒 6 隻怪物才往下探（Boss 層只有 Boss 一隻）
   boss_every: 10               # 每 10 層一隻 Boss，打倒後解鎖該層傳送點
   boss_multiplier_pct: 200     # Boss 的 HP、攻擊再乘 200%
   element_advantage_pct: 150   # 屬性相剋時傷害 ×1.5

@@ -64,6 +64,7 @@ type Balance struct {
 
 type Dungeon struct {
 	GrowthPerFloorPct      int      `yaml:"growth_per_floor_pct"`
+	EncountersPerFloor     int      `yaml:"encounters_per_floor"`
 	BossEvery              int      `yaml:"boss_every"`
 	BossMultiplierPct      int      `yaml:"boss_multiplier_pct"`
 	ElementAdvantagePct    int      `yaml:"element_advantage_pct"`
@@ -169,6 +170,25 @@ type Logs struct {
 	Pet            string              `yaml:"pet"`
 	NoPet          string              `yaml:"no_pet"`
 	Commit         map[string][]string `yaml:"commit"` // 依 commit 類型；必須有 other
+	Dungeon        DungeonLogs         `yaml:"dungeon"`
+}
+
+type DungeonLogs struct {
+	Descend       string `yaml:"descend"`
+	Encounter     string `yaml:"encounter"`
+	Boss          string `yaml:"boss"`
+	Kill          string `yaml:"kill"`
+	BossKill      string `yaml:"boss_kill"`
+	Drop          string `yaml:"drop"`
+	BagFull       string `yaml:"bag_full"`
+	Downed        string `yaml:"downed"`
+	Rescue        string `yaml:"rescue"`
+	IdentifyEquip string `yaml:"identify_equip"`
+	IdentifySkip  string `yaml:"identify_skip"`
+	Camp          string `yaml:"camp"`
+	Warp          string `yaml:"warp"`
+	WarpEntrance  string `yaml:"warp_entrance"`
+	WarpDenied    string `yaml:"warp_denied"`
 }
 
 // Parse 解析並驗證內容；未知欄位視為錯誤，避免打錯字默默失效。
@@ -257,6 +277,13 @@ func (p *Pack) validate() error {
 	if len(p.Logs.Commit["other"]) == 0 {
 		return fmt.Errorf("logs.yaml: commit 必須有 other")
 	}
+	dl := p.Logs.Dungeon
+	for _, s := range []string{dl.Descend, dl.Encounter, dl.Boss, dl.Kill, dl.BossKill, dl.Drop, dl.BagFull, dl.Downed, dl.Rescue,
+		dl.IdentifyEquip, dl.IdentifySkip, dl.Camp, dl.Warp, dl.WarpEntrance, dl.WarpDenied} {
+		if s == "" {
+			return fmt.Errorf("logs.yaml: dungeon 的每一句都要有內容")
+		}
+	}
 	for kind, lines := range p.Logs.Commit {
 		if len(lines) == 0 {
 			return fmt.Errorf("logs.yaml: commit.%s 至少要一句", kind)
@@ -302,7 +329,7 @@ func Embedded() Files {
 
 func (p *Pack) validateDungeon() error {
 	d := p.Balance.Dungeon
-	if d.BossEvery < 1 || d.GrowthPerFloorPct < 0 || d.BossMultiplierPct < 100 || d.RescueHPPct < 1 || d.RescueHPPct > 100 ||
+	if d.BossEvery < 1 || d.EncountersPerFloor < 1 || d.GrowthPerFloorPct < 0 || d.BossMultiplierPct < 100 || d.RescueHPPct < 1 || d.RescueHPPct > 100 ||
 		d.CampAfterHours < 1 || d.ItemPowerPerFloors < 1 || d.ElementAdvantagePct < 100 || d.ElementDisadvantagePct < 1 {
 		return fmt.Errorf("balance.yaml: dungeon 的數值超出範圍")
 	}

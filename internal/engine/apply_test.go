@@ -29,6 +29,39 @@ var testPack = &content.Pack{
 		Commit: map[string][]string{"feat": {"{name} 新功能 +{xp}"}, "other": {"{name} 搬了 {lines} 行 +{xp}"}},
 	},
 	XPTable: content.XPTable(18, 1.3, 10),
+	// 小型地城：一般怪物只有 slimy（水），每 3 層一隻 Boss king（火）。
+	Monsters: []content.Monster{
+		{ID: "slimy", Name: "黏黏", Element: "water", HP: 10, Atk: 4},
+		{ID: "king", Name: "國王", Element: "fire", HP: 20, Atk: 6, Boss: true},
+	},
+	Floors: content.Floors{
+		Tiers: []struct {
+			From     int      `yaml:"from"`
+			Monsters []string `yaml:"monsters"`
+		}{{From: 1, Monsters: []string{"slimy"}}},
+		Bosses: []string{"king"},
+	},
+	Items: content.Items{
+		Weapon: map[string][]string{"fire": {"火劍"}, "water": {"水劍"}, "grass": {"草劍"}},
+		Armor:  map[string][]string{"fire": {"火甲"}, "water": {"水甲"}, "grass": {"草甲"}},
+	},
+}
+
+func init() {
+	testPack.Balance.Dungeon = content.Dungeon{
+		GrowthPerFloorPct: 10, EncountersPerFloor: 2, BossEvery: 3, BossMultiplierPct: 200,
+		ElementAdvantagePct: 150, ElementDisadvantagePct: 50,
+		PetAtkBase: 5, PetAtkPerLevel: 2, PetDefPerLevel: 1,
+		RescueHPPct: 50, CampAfterHours: 8, ItemPowerBase: 1, ItemPowerPerFloors: 5,
+		AttackTools: []string{"Edit", "Write"},
+	}
+	testPack.Logs.Dungeon = content.DungeonLogs{
+		Descend: "下探 B{floor} {monster}（{element}）", Encounter: "又遇到 B{floor} {monster}", Boss: "Boss B{floor} {monster}", Kill: "打倒 {monster}",
+		BossKill: "打倒 Boss {monster} 解鎖 B{floor}", Drop: "掉落 {bag}/{bag_max}", BagFull: "背包滿",
+		Downed: "倒地 B{floor} 遺失 {lost}", Rescue: "救援 B{floor}", IdentifyEquip: "裝上 {item}",
+		IdentifySkip: "賣掉 {item}", Camp: "紮營", Warp: "傳送 B{floor}", WarpEntrance: "回入口",
+		WarpDenied: "拒絕 B{floor}：{reason}",
+	}
 }
 
 var (
@@ -244,7 +277,8 @@ func TestSeqAndMeta(t *testing.T) {
 // 新增任何時間效果都要讓它在這裡被測到。
 func TestTimeEffectsArePathIndependent(t *testing.T) {
 	base := hatched
-	base.Pet.HP = 1 // 讓回血可被觀察
+	base.Pet.HP = 1              // 讓回血可被觀察
+	base.Dungeon.LastActive = t0 // 讓紮營（閒置 8 小時回滿）也被涵蓋
 	splits := []time.Duration{0, time.Second, 7 * time.Minute, 29*time.Minute + 59*time.Second, 30 * time.Minute, 59 * time.Minute, 3*time.Hour + 1, 40 * time.Hour}
 	for _, total := range []time.Duration{0, 9 * time.Minute, 95 * time.Minute, 10 * time.Hour, 200 * time.Hour} {
 		once := Apply(base, tick(t0.Add(total)), testPack).State
