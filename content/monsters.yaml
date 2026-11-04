@@ -1,0 +1,19 @@
+# 怪物。id 會寫進 state.json，改 name 不影響存檔；不要刪除已經出現過的 id。
+# element：fire（火）、water（水）、grass（草），火剋草、草剋水、水剋火。
+# hp、atk 是第 1 層的數值，往下每層依 balance.yaml 的 dungeon.growth_per_floor_pct 成長。
+# boss: true 的只會在 Boss 層出現（見 floors.yaml），能力再乘上 dungeon.boss_multiplier_pct。
+
+- {id: null_slime,   name: Null 史萊姆,        element: water, hp: 10, atk: 3}
+- {id: off_by_one,   name: Off-by-one 哥布林,  element: grass, hp: 12, atk: 4}
+- {id: race_bat,     name: 競態蝙蝠,           element: fire,  hp: 8,  atk: 5}
+- {id: leak_shroom,  name: 記憶體洩漏菇,       element: grass, hp: 14, atk: 3}
+- {id: deadlock,     name: 死鎖骷髏,           element: fire,  hp: 16, atk: 5}
+- {id: debt_kelpie,  name: 技術債水妖,         element: water, hp: 15, atk: 5}
+- {id: spaghetti,    name: 義大利麵樹精,       element: grass, hp: 22, atk: 4}
+- {id: hotfix,       name: 熱修補火蜥蜴,       element: fire,  hp: 18, atk: 6}
+- {id: monolith,     name: 巨石單體魔像,       element: water, hp: 28, atk: 5}
+- {id: flaky,        name: Flaky 怨靈,         element: fire,  hp: 20, atk: 7}
+
+- {id: bug_king,     name: 臭蟲之王,           element: grass, hp: 16, atk: 5, boss: true}
+- {id: merge_hydra,  name: 合併衝突九頭蛇,     element: water, hp: 18, atk: 5, boss: true}
+- {id: legacy_drake, name: 遺留系統巨龍,       element: fire,  hp: 20, atk: 6, boss: true}

@@ -41,14 +41,27 @@ func TestXPTableMatchesDesignNotes(t *testing.T) {
 
 func TestParseRejects(t *testing.T) {
 	ok := Embedded()
+	if _, err := Parse(ok); err != nil {
+		t.Fatalf("正式內容應該通過: %v", err)
+	}
+	with := func(edit func(f *Files)) Files { f := ok; edit(&f); return f }
 	cases := map[string]Files{
-		"balance 未知欄位": {Balance: append(bytes.Clone(ok.Balance), "\ntypo: 1\n"...), Species: ok.Species, Logs: ok.Logs},
-		"balance 壞掉":   {Balance: []byte("xp: ["), Species: ok.Species, Logs: ok.Logs},
-		"沒有 other":     {Balance: bytes.Replace(ok.Balance, []byte("other: 10"), []byte("misc: 10"), 1), Species: ok.Species, Logs: ok.Logs},
-		"物種重複":         {Balance: ok.Balance, Species: []byte("- {id: a, name: A}\n- {id: a, name: B}\n"), Logs: ok.Logs},
-		"舊 id 與 id 重複": {Balance: ok.Balance, Species: []byte("- {id: a, name: A}\n- {id: b, name: B, aliases: [a]}\n"), Logs: ok.Logs},
-		"沒有物種":         {Balance: ok.Balance, Species: []byte("[]"), Logs: ok.Logs},
-		"日誌沒有 other":   {Balance: ok.Balance, Species: ok.Species, Logs: []byte("commit: {feat: [x]}")},
+		"balance 未知欄位": with(func(f *Files) { f.Balance = append(bytes.Clone(ok.Balance), "\ntypo: 1\n"...) }),
+		"balance 壞掉":   with(func(f *Files) { f.Balance = []byte("xp: [") }),
+		"沒有 other":     with(func(f *Files) { f.Balance = bytes.Replace(ok.Balance, []byte("other: 10"), []byte("misc: 10"), 1) }),
+		"物種重複":         with(func(f *Files) { f.Species = []byte("- {id: a, name: A}\n- {id: a, name: B}\n") }),
+		"舊 id 與 id 重複": with(func(f *Files) { f.Species = []byte("- {id: a, name: A}\n- {id: b, name: B, aliases: [a]}\n") }),
+		"沒有物種":         with(func(f *Files) { f.Species = []byte("[]") }),
+		"日誌沒有 other":   with(func(f *Files) { f.Logs = []byte("commit: {feat: [x]}") }),
+		"怪物屬性錯誤": with(func(f *Files) {
+			f.Monsters = bytes.Replace(ok.Monsters, []byte("element: water"), []byte("element: light"), 1)
+		}),
+		"樓層引用不存在的怪物": with(func(f *Files) { f.Floors = bytes.Replace(ok.Floors, []byte("null_slime"), []byte("ghost"), 1) }),
+		"一般層放了 Boss": with(func(f *Files) { f.Floors = bytes.Replace(ok.Floors, []byte("[null_slime"), []byte("[bug_king"), 1) }),
+		"缺少某屬性的裝備":   with(func(f *Files) { f.Items = []byte("weapon: {fire: [a]}\narmor: {fire: [b]}") }),
+		"Boss 間隔為 0": with(func(f *Files) {
+			f.Balance = bytes.Replace(ok.Balance, []byte("boss_every: 10"), []byte("boss_every: 0"), 1)
+		}),
 	}
 	for name, f := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -56,6 +69,27 @@ func TestParseRejects(t *testing.T) {
 				t.Fatal("應該回傳錯誤")
 			}
 		})
+	}
+}
+
+func TestDungeonLookups(t *testing.T) {
+	p, _ := Default()
+	if len(p.Monsters) < 10 {
+		t.Fatalf("至少要 10 種一般怪物以上，實際 %d", len(p.Monsters))
+	}
+	for floor, want := range map[int]string{1: "", 9: "", 10: "bug_king", 20: "merge_hydra", 30: "legacy_drake", 40: "bug_king", 15: ""} {
+		if got := p.BossFor(floor); got != want {
+			t.Errorf("BossFor(%d) = %q, want %q", floor, got, want)
+		}
+	}
+	if got := p.TierMonsters(1); got[0] != "null_slime" {
+		t.Errorf("TierMonsters(1) = %v", got)
+	}
+	if got := p.TierMonsters(999); got[0] != "spaghetti" {
+		t.Errorf("最深處用最後一段: %v", got)
+	}
+	if !p.IsAttackTool("Edit") || p.IsAttackTool("Read") {
+		t.Error("攻擊工具判斷錯誤")
 	}
 }
 

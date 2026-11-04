@@ -1,0 +1,10 @@
+# 樓層。下探到某層時，從「from ≤ 樓層」的最後一段挑一隻怪物（用 commit hash＋樓層＋Seq 決定，重播結果不變）。
+# 每 dungeon.boss_every 層（balance.yaml）是 Boss 層，依序輪流出現 bosses 裡的 Boss；打倒後解鎖該層的傳送點。
+
+tiers:
+  - {from: 1,  monsters: [null_slime, off_by_one, race_bat]}
+  - {from: 10, monsters: [off_by_one, leak_shroom, deadlock, debt_kelpie]}
+  - {from: 20, monsters: [deadlock, debt_kelpie, spaghetti, hotfix]}
+  - {from: 30, monsters: [spaghetti, hotfix, monolith, flaky]}
+
+bosses: [bug_king, merge_hydra, legacy_drake]
