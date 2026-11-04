@@ -106,3 +106,89 @@ func TestInstallUninstallGit(t *testing.T) {
 		t.Fatal("非 repo 應報錯")
 	}
 }
+
+func TestDoctor(t *testing.T) {
+	t.Setenv("DND_HOME", t.TempDir())
+	repo := gitRepo(t)
+	settings := filepath.Join(t.TempDir(), "settings.json")
+
+	out, err := dnd(t, "doctor", "--repo", repo, "--settings", settings)
+	if err == nil || !strings.Contains(out, "✗ 寵物") || !strings.Contains(out, "✗ git hook") || !strings.Contains(out, "✗ Claude Code") {
+		t.Fatalf("全新環境應列出問題: %v\n%s", err, out)
+	}
+
+	if _, err := dnd(t, "hatch", "--species", "dwarf"); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(settings, []byte(`{"statusLine":{"type":"command","command":"'/nowhere/dnd' statusline"}}`), 0o600)
+	out, _ = dnd(t, "doctor", "--repo", repo, "--settings", settings)
+	if !strings.Contains(out, "✓ 寵物") || !strings.Contains(out, "/nowhere/dnd 不存在") || !strings.Contains(out, "PostToolUse hook、Stop hook 未安裝") {
+		t.Fatalf("應指出缺少的 hook 與失效路徑:\n%s", out)
+	}
+}
+
+// statusline 在沒有寵物、資料壞掉時也要輸出一行並成功（Claude Code 只顯示 exit 0 的輸出）。
+func TestStatuslineNeverFails(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("DND_HOME", home)
+	out, err := dnd(t, "statusline")
+	if err != nil || out != "dnd：還沒有寵物（dnd hatch）" {
+		t.Fatalf("err=%v out=%q", err, out)
+	}
+	os.WriteFile(filepath.Join(home, "state.json"), []byte("{"), 0o600)
+	if out, err := dnd(t, "statusline"); err != nil || !strings.Contains(out, "讀取失敗") {
+		t.Fatalf("err=%v out=%q", err, out)
+	}
+}
+
+func TestStatuslineChainsOriginal(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("DND_HOME", home)
+	if _, err := dnd(t, "hatch", "--species", "elf", "--name", "小精"); err != nil {
+		t.Fatal(err)
+	}
+	orig := filepath.Join(home, "claude", "original-statusline.json")
+	os.MkdirAll(filepath.Dir(orig), 0o755)
+	// 原本的 statusLine 會收到同一份 stdin
+	os.WriteFile(orig, []byte(`{"type":"command","command":"printf 'orig:'; cat"}`), 0o600)
+	root := newRoot()
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetIn(strings.NewReader(`{"model":"x"}`))
+	root.SetArgs([]string{"statusline"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got := buf.String(); !strings.HasPrefix(got, `orig:{"model":"x"}  小精 Lv 1`) {
+		t.Fatalf("got %q", got)
+	}
+}
+
+// Claude Code 的 Stop hook 若 exit 2 會讓 Claude 停不下來：hook claude 對任何輸入都必須安靜成功。
+func TestHookClaude(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("DND_HOME", home)
+	for _, in := range []string{
+		`{"hook_event_name":"Stop","cwd":"/x/commit-dnd"}`,
+		`{"hook_event_name":"PostToolUse","tool_name":"Edit","cwd":"/x/commit-dnd"}`,
+		`not json`, ``,
+	} {
+		root := newRoot()
+		var buf bytes.Buffer
+		root.SetOut(&buf)
+		root.SetErr(&buf)
+		root.SetIn(strings.NewReader(in))
+		root.SetArgs([]string{"hook", "claude"})
+		if err := root.Execute(); err != nil || buf.Len() != 0 {
+			t.Fatalf("%q: err=%v out=%q", in, err, buf.String())
+		}
+	}
+	out, _ := dnd(t, "statusline")
+	if !strings.Contains(out, "還沒有寵物") {
+		t.Fatalf("%q", out)
+	}
+	b, _ := os.ReadFile(filepath.Join(home, "events.jsonl"))
+	if n := bytes.Count(b, []byte("\n")); n != 2 {
+		t.Fatalf("應寫入 2 個事件，實際 %d:\n%s", n, b)
+	}
+}
