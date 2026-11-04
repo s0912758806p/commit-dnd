@@ -10,6 +10,7 @@ import (
 	"time"
 
 	codexadapter "github.com/s0912758806p/commit-dnd/internal/adapter/codex"
+	"github.com/s0912758806p/commit-dnd/internal/clock"
 	"github.com/s0912758806p/commit-dnd/internal/home"
 	"github.com/s0912758806p/commit-dnd/internal/install"
 	"github.com/spf13/cobra"
@@ -39,7 +40,7 @@ func hookCodex(args []string) error {
 	}
 	raw := []byte(args[len(args)-1])
 	captureCodex(raw)
-	events, err := codexadapter.Adapter{}.Parse(raw, time.Now())
+	events, err := codexadapter.Adapter{}.Parse(raw, clock.Now())
 	if err != nil || len(events) == 0 {
 		return err
 	}

@@ -85,7 +85,7 @@ func (s *FileStore) History() ([]engine.LogLine, error) {
 		return nil, err
 	}
 	var logs []engine.LogLine
-	_, _, err = s.replayData(data, func(r engine.Result) { logs = append(logs, r.Logs...) })
+	_, _, err = s.replayData(data, func(_ event.Event, _ engine.State, r engine.Result) { logs = append(logs, r.Logs...) })
 	return logs, err
 }
 
@@ -176,9 +176,9 @@ func (s *FileStore) replay() (snapshot, error) {
 	return snap, nil
 }
 
-// replayData 依序套用每一行事件；visit 不為 nil 時收到每個事件的 Result。
+// replayData 依序套用每一行事件；visit 不為 nil 時收到每個事件、套用前的狀態與 Result。
 // torn 表示結尾有當機留下的半行（已略過）。
-func (s *FileStore) replayData(data []byte, visit func(engine.Result)) (snap snapshot, torn bool, err error) {
+func (s *FileStore) replayData(data []byte, visit func(event.Event, engine.State, engine.Result)) (snap snapshot, torn bool, err error) {
 	var st engine.State
 	good := 0
 	for good < len(data) {
@@ -195,7 +195,7 @@ func (s *FileStore) replayData(data []byte, visit func(engine.Result)) (snap sna
 		}
 		r := engine.Apply(st, e, s.pack)
 		if visit != nil {
-			visit(r)
+			visit(e, st, r)
 		}
 		st = r.State
 		good += nl + 1

@@ -7,9 +7,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/s0912758806p/commit-dnd/content"
+	"github.com/s0912758806p/commit-dnd/internal/clock"
 	"github.com/s0912758806p/commit-dnd/internal/event"
 	"github.com/spf13/cobra"
 )
@@ -53,7 +53,7 @@ func newHatchCmd() *cobra.Command {
 			}
 
 			r, err := s.Update(event.Event{
-				At: time.Now(), Source: event.SourceUser, Type: "hatch",
+				At: clock.Now(), Source: event.SourceUser, Type: "hatch",
 				Args: map[string]string{"species": species, "name": name},
 			})
 			if err != nil {

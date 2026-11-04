@@ -32,6 +32,7 @@ func newDoctorCmd() *cobra.Command {
 			d := &doctor{cmd: cmd}
 			d.binary()
 			d.data()
+			d.debugTime()
 			d.gitHook(repo)
 			d.claude(settings)
 			d.codex(codexConfig)
