@@ -1,18 +1,22 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
+	claudeadapter "github.com/s0912758806p/commit-dnd/internal/adapter/claude"
 	gitadapter "github.com/s0912758806p/commit-dnd/internal/adapter/git"
 	"github.com/s0912758806p/commit-dnd/internal/home"
 	"github.com/spf13/cobra"
 )
 
-// `dnd hook git`：由 post-commit 呼叫（隱藏指令）。不輸出任何東西、永遠 exit 0。
+// `dnd hook git`（post-commit）與 `dnd hook claude`（Claude Code hook）：隱藏指令，不輸出任何東西、永遠 exit 0。
 func newHookCmd() *cobra.Command {
 	hook := &cobra.Command{Use: "hook", Short: "給外部工具呼叫的 hook", Hidden: true}
 	hook.AddCommand(&cobra.Command{
@@ -21,7 +25,66 @@ func newHookCmd() *cobra.Command {
 		Args:  cobra.ArbitraryArgs,
 		Run:   func(*cobra.Command, []string) { runHook("git", hookGit) },
 	})
+	hook.AddCommand(&cobra.Command{
+		Use:   "claude",
+		Short: "Claude Code 的 PostToolUse／Stop：把 AI 活動寫成事件",
+		Args:  cobra.ArbitraryArgs,
+		Run: func(cmd *cobra.Command, _ []string) {
+			runHook("claude", func() error { return hookClaude(cmd.InOrStdin()) })
+		},
+	})
 	return hook
+}
+
+func hookClaude(stdin io.Reader) error {
+	raw, err := io.ReadAll(io.LimitReader(stdin, 64<<20))
+	if err != nil {
+		return err
+	}
+	captureClaude(raw)
+	events, err := claudeadapter.Adapter{}.Parse(raw, time.Now())
+	if err != nil || len(events) == 0 {
+		return err
+	}
+	s, _, err := openStore()
+	if err != nil {
+		return err
+	}
+	for _, e := range events {
+		if _, err := s.Update(e); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// captureClaude 在 $DND_HOME/capture/claude 存在時，把原始 hook JSON 依事件與工具名稱存一份
+// （同類覆寫），用來收集 testdata 樣本。平常這個目錄不存在，什麼都不做。
+func captureClaude(raw []byte) {
+	dir, err := home.Dir()
+	if err != nil {
+		return
+	}
+	dir = filepath.Join(dir, "capture", "claude")
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return
+	}
+	var p struct {
+		Event string `json:"hook_event_name"`
+		Tool  string `json:"tool_name"`
+	}
+	_ = json.Unmarshal(raw, &p)
+	name := strings.Trim(p.Event+"-"+p.Tool, "-")
+	if name == "" {
+		name = "unknown"
+	}
+	name = strings.Map(func(r rune) rune {
+		if r == '/' || r == '\\' || r == ':' {
+			return '_'
+		}
+		return r
+	}, name)
+	_ = os.WriteFile(filepath.Join(dir, name+".json"), raw, 0o600)
 }
 
 func hookGit() error {
