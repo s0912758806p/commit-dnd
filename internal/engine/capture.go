@@ -132,13 +132,13 @@ func PartyAtk(s State, c *content.Pack) int {
 	for _, id := range s.Party.Members[:s.Party.N] {
 		total += MemberAtk(s, c, id)
 	}
-	return total
+	return pct(total, 100+Ability(s.Pet, c, "party_pct"))
 }
 
 // ComboPct 是合體技的傷害倍率（寵物攻擊的百分比）：隊員越多越強。
 func ComboPct(s State, c *content.Pack) int {
 	b := c.Balance.Party
-	return b.ComboBasePct + b.ComboPerMemberPct*s.Party.N
+	return b.ComboBasePct + b.ComboPerMemberPct*s.Party.N + Ability(s.Pet, c, "combo_pct")
 }
 
 // ComboReady 回報在 at 這個時間 commit 是否會發動合體技（前 combo_window_minutes 內有 AI 活動）。
@@ -147,11 +147,12 @@ func ComboReady(s State, at time.Time, c *content.Pack) bool {
 	return !s.Party.LastAI.IsZero() && at.Sub(s.Party.LastAI) <= window
 }
 
-// captureChance 是收服眼前怪物的機率（百分比）。
-func captureChance(m Monster, c *content.Pack) int {
+// captureChance 是收服眼前怪物的機率（百分比，最多 100）；含 capture_pct 終職能力。
+func captureChance(s State, c *content.Pack) int {
 	b := c.Balance.Party
+	m := s.Dungeon.Monster
 	missing := max(0, m.MaxHP-m.HP)
-	return b.CaptureBasePct + b.CaptureMissingHPPct*missing/max(1, m.MaxHP)
+	return min(100, b.CaptureBasePct+b.CaptureMissingHPPct*missing/max(1, m.MaxHP)+Ability(s.Pet, c, "capture_pct"))
 }
 
 // noteAI 記錄 AI 活動的時間。
@@ -199,7 +200,7 @@ func capture(r *Result, e event.Event, c *content.Pack) bool {
 		return false
 	}
 	rr := rng{seedFor(r.State, e.Seq, "capture")}
-	if rr.intn(100) >= captureChance(d.Monster, c) {
+	if rr.intn(100) >= captureChance(r.State, c) {
 		r.dlog(e.At, c, c.Logs.Party.CaptureFail, nil)
 		return false
 	}
@@ -228,7 +229,7 @@ func capture(r *Result, e event.Event, c *content.Pack) bool {
 func combo(r *Result, e event.Event, c *content.Pack) {
 	d := &r.State.Dungeon
 	m, _ := c.MonsterByID(d.Monster.ID)
-	dmg := max(1, pct(pct(PetAtk(r.State, c), ComboPct(r.State, c)), elementPct(d.Weapon.Element, m.Element, c)))
+	dmg := max(1, pct(pct(PetAtk(r.State, c), ComboPct(r.State, c)), petElementPct(r.State, m, c)))
 	r.State.Party.Combos++
 	r.dlog(e.At, c, c.Logs.Party.Combo, map[string]string{"dmg": strconv.Itoa(dmg)})
 	r.Fx = append(r.Fx, EffectCombo)

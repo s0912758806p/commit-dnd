@@ -2,7 +2,7 @@
 
 這個專案是什麼，見 [README](../README.md)。
 
-目前進度：**迭代 5（職業、特化與進化）**——孵蛋、commit 給經驗與升級、每日補給、飽足／心情／HP 隨時間變化、冒險日誌；Claude Code 的 AI 回合帶寵物闖地下城，commit 救援與鑑定裝備；`fix:` commit 收服怪物組隊，AI 工作中的 commit 發動合體技；依 commit 習慣轉職、Lv 15 選特化、Lv 10／20 進化，`dnd sim` 用 repo 的 git log 模擬成長。
+目前進度：**迭代 6（終職與轉生）**——孵蛋、commit 給經驗與升級、每日補給、飽足／心情／HP 隨時間變化、冒險日誌；Claude Code 的 AI 回合帶寵物闖地下城，commit 救援與鑑定裝備；`fix:` commit 收服怪物組隊，AI 工作中的 commit 發動合體技；依 commit 習慣轉職、Lv 15 選特化、Lv 10／20 進化，Lv 30 取得終職後可以轉生，`dnd sim` 用 repo 的 git log 模擬成長。
 
 ## 安裝
 
@@ -56,6 +56,14 @@ dnd log              # 冒險日誌
 - **進化**：Lv 10 第 2 階段、Lv 20 第 3 階段，每個種族有自己的名稱（例如人族：見習者 → 勇者 → 英雄），能力再小幅提升。
 - 名稱與數值都在 `content/classes.yaml`。
 
+**終職與轉生**（`dnd class` 查看）：
+- **Lv 30 終職**：依當時的特化取得對應的終職（12 種，每個特化一種；Lv 30 還沒選特化的話，選的那一刻取得）。
+  每個終職帶一種被動能力，例如破曉射手「合體技倍率 +50%」、審判者「收服機率 +10%」、不落要塞「倒地時保留 2 件未鑑定裝備」。
+  能力只強化 commit 與玩法，**不會讓 AI 回血或免除倒地**。完整清單在 `content/classes.yaml` 的 `finals`。
+- **轉生**：取得終職後，`dnd rebirth` 讓寵物從 Lv 1 重來。等級、職業、特化、進化、卷軸、裝備、背包、樓層與傳送點重置；
+  種族、名字、commit 組成、**圖鑑、隊伍、終職能力**保留。每轉生一次，基礎能力 +10%、commit 經驗 +20%（累加）。
+- **能力疊加**：取得過的終職能力全部跨轉生保留；同一個終職再次取得時強化一級（效果翻倍、三倍……）。
+
 **模擬**：`dnd sim ~/某個-repo` 用那個 repo 的 git log 重播（只讀，不寫 repo、不動你的寵物），列出到 Lv 5／10／20／30 各要幾天與會轉成什麼職業；加上 `--ai-turns-per-commit 5` 估計地下城能下探到哪裡。
 
 **接上 Claude Code**：執行 `dnd install claude`，確認差異後寫入。Claude Code 會自動重新載入設定，不需要重啟；底部 statusline 會顯示寵物與今日 AI 回合。設定檔位置依序為 `--settings`、`$CLAUDE_CONFIG_DIR/settings.json`、`~/.claude/settings.json`。
@@ -73,6 +81,7 @@ dnd log              # 冒險日誌
 | `dnd class` | 職業、特化、進化、加成、轉職卷軸、commit 組成與目前的判定，並列出可選的職業或特化（不寫檔） |
 | `dnd class choose <特化 id>` | Lv 15 起選擇特化（一次）；不合法時印出原因、不改變寵物 |
 | `dnd class reroll` | 用一張轉職卷軸，依目前的 commit 組成重新轉職並清除特化；結果不變時不消耗 |
+| `dnd rebirth [--yes]` | 取得終職且 Lv 30 以上時轉生：先列出會重置／保留什麼並詢問（非互動時需要 `--yes`） |
 | `dnd sim [repo] [--author 樣式] [--from YYYY-MM-DD] [--species id] [--ai-turns-per-commit N] [--edits-per-turn 2]` | 用 repo 的 git log 模擬升級時間表、職業與地下城；只讀 git log，不讀寫 `DND_HOME` |
 | `dnd warp <樓層>` | 傳送到入口（`0`）或已解鎖的 Boss 層（打倒過 Boss 的 B10、B20…）；倒地中不能傳送 |
 | `dnd dex` | 圖鑑：每種怪物收服幾次、最深收服樓層、是否在隊伍中；遇過還沒收服的顯示遇過次數，沒遇過的顯示 `???`（不寫檔） |

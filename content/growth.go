@@ -1,6 +1,7 @@
 package content
 
-// classes.yaml（迭代 5）：職業、特化、進化與轉職卷軸。規則在 internal/engine/class.go。
+// classes.yaml：職業、特化、進化與轉職卷軸（迭代 5，規則在 internal/engine/class.go），
+// 終職與轉生（迭代 6，規則在 internal/engine/rebirth.go）。
 
 import (
 	"fmt"
@@ -39,7 +40,54 @@ type Growth struct {
 	Stages     []Stage             `yaml:"stages"`
 	StageNames map[string][]string `yaml:"stage_names"` // 物種 id → 各階段名稱
 	Scroll     Scroll              `yaml:"scroll"`
+	FinalLevel int                 `yaml:"final_level"`
+	Finals     []Final             `yaml:"finals"`
+	Rebirth    Rebirth             `yaml:"rebirth"`
 	Logs       GrowthLogs          `yaml:"logs"`
+}
+
+// Final 是終職：由特化 Spec 決定，帶一種被動能力，效果 = PerLevel × 終職等級。
+type Final struct {
+	ID       string `yaml:"id"`
+	Spec     string `yaml:"spec"`
+	Name     string `yaml:"name"`
+	Ability  string `yaml:"ability"`
+	PerLevel int    `yaml:"per_level"`
+	Kind     string `yaml:"kind"` // 只有 kind_xp_pct 使用：哪一類 commit
+}
+
+// Rebirth 是轉生的條件與每次轉生累加的加成。
+type Rebirth struct {
+	Level    int `yaml:"level"`
+	StatsPct int `yaml:"stats_pct"`
+	XPPct    int `yaml:"xp_pct"`
+}
+
+// MaxFinals 是終職種類的上限；engine.Legacy 用固定大小陣列記錄，State 才能保持可比較。
+const MaxFinals = 32
+
+// abilityText 是各種能力的說明格式（%d 代入效果數值）；同時是合法能力的清單。
+var abilityText = map[string]string{
+	"combo_pct":      "合體技倍率 +%d%%",
+	"satiety_slow":   "飽足下降速度 −%d%%",
+	"capture_pct":    "收服機率 +%d%%",
+	"rescue_hp_pct":  "commit 救起時的 HP +%d%%",
+	"kind_xp_pct":    "%s commit 的經驗 +%d%%",
+	"keep_on_down":   "倒地時保留 %d 件未鑑定裝備",
+	"item_power":     "鑑定出的裝備強度 +%d",
+	"commit_heal":    "每筆 commit 多回復 %d HP",
+	"element_pct":    "屬性相剋時傷害 +%d%%",
+	"supply_commits": "每天的補給次數 +%d",
+	"party_pct":      "隊伍攻擊加成 +%d%%",
+	"scroll_pct":     "轉職卷軸掉落機率 +%d%%",
+}
+
+// AbilityText 回傳終職在某等級的能力說明，例如「合體技倍率 +100%」。
+func (f Final) AbilityText(level int) string {
+	if f.Ability == "kind_xp_pct" {
+		return fmt.Sprintf(abilityText[f.Ability], f.Kind, f.PerLevel*level)
+	}
+	return fmt.Sprintf(abilityText[f.Ability], f.PerLevel*level)
 }
 
 type Class struct {
@@ -70,16 +118,20 @@ type Scroll struct {
 }
 
 type GrowthLogs struct {
-	Judge        string `yaml:"judge"`
-	SpecReady    string `yaml:"spec_ready"`
-	SpecChosen   string `yaml:"spec_chosen"`
-	SpecDenied   string `yaml:"spec_denied"`
-	Evolve       string `yaml:"evolve"`
-	ScrollDrop   string `yaml:"scroll_drop"`
-	ScrollFull   string `yaml:"scroll_full"`
-	Reroll       string `yaml:"reroll"`
-	RerollSame   string `yaml:"reroll_same"`
-	RerollDenied string `yaml:"reroll_denied"`
+	Judge         string `yaml:"judge"`
+	SpecReady     string `yaml:"spec_ready"`
+	SpecChosen    string `yaml:"spec_chosen"`
+	SpecDenied    string `yaml:"spec_denied"`
+	Evolve        string `yaml:"evolve"`
+	ScrollDrop    string `yaml:"scroll_drop"`
+	ScrollFull    string `yaml:"scroll_full"`
+	Reroll        string `yaml:"reroll"`
+	RerollSame    string `yaml:"reroll_same"`
+	RerollDenied  string `yaml:"reroll_denied"`
+	Final         string `yaml:"final"`
+	FinalUp       string `yaml:"final_up"`
+	Rebirth       string `yaml:"rebirth"`
+	RebirthDenied string `yaml:"rebirth_denied"`
 }
 
 func (p *Pack) validateGrowth() error {
@@ -123,8 +175,12 @@ func (p *Pack) validateGrowth() error {
 	if g.Scroll.DropPct < 0 || g.Scroll.DropPct > 100 || g.Scroll.Max < 1 {
 		return fmt.Errorf("classes.yaml: scroll 需 0 ≤ drop_pct ≤ 100、max ≥ 1")
 	}
+	if err := p.validateFinals(); err != nil {
+		return err
+	}
 	l := g.Logs
-	for _, s := range []string{l.Judge, l.SpecReady, l.SpecChosen, l.SpecDenied, l.Evolve, l.ScrollDrop, l.ScrollFull, l.Reroll, l.RerollSame, l.RerollDenied} {
+	for _, s := range []string{l.Judge, l.SpecReady, l.SpecChosen, l.SpecDenied, l.Evolve, l.ScrollDrop, l.ScrollFull, l.Reroll, l.RerollSame, l.RerollDenied,
+		l.Final, l.FinalUp, l.Rebirth, l.RebirthDenied} {
 		if s == "" {
 			return fmt.Errorf("classes.yaml: logs 的每一句都要有內容")
 		}
@@ -174,4 +230,56 @@ func (p *Pack) StageName(species string, stage int) string {
 		return ""
 	}
 	return names[stage-1]
+}
+
+// validateFinals：每個特化剛好一個終職、能力合法；轉生門檻不低於終職等級。
+func (p *Pack) validateFinals() error {
+	g := p.Growth
+	if g.FinalLevel <= g.SpecLevel || len(g.Finals) > MaxFinals {
+		return fmt.Errorf("classes.yaml: 需 final_level > spec_level，終職最多 %d 種", MaxFinals)
+	}
+	if g.Rebirth.Level < g.FinalLevel || g.Rebirth.StatsPct < 0 || g.Rebirth.XPPct < 0 {
+		return fmt.Errorf("classes.yaml: rebirth.level 不可低於 final_level，加成不可為負")
+	}
+	ids, specs := map[string]bool{}, map[string]bool{}
+	for _, f := range g.Finals {
+		_, known := abilityText[f.Ability]
+		if f.ID == "" || f.Name == "" || ids[f.ID] || specs[f.Spec] || !known || f.PerLevel < 1 ||
+			(f.Ability == "kind_xp_pct") != (f.Kind != "") || (f.Kind != "" && !slices.Contains(MixKinds[:], f.Kind)) {
+			return fmt.Errorf("classes.yaml: 終職 %q 的 id／name／spec／ability／per_level／kind 不正確或重複", f.ID)
+		}
+		ids[f.ID], specs[f.Spec] = true, true
+	}
+	for _, c := range g.Classes {
+		for _, s := range c.Specs {
+			if !specs[s.ID] {
+				return fmt.Errorf("classes.yaml: 特化 %q 沒有對應的終職", s.ID)
+			}
+			delete(specs, s.ID)
+		}
+	}
+	for s := range specs {
+		return fmt.Errorf("classes.yaml: 終職引用了不存在的特化 %q", s)
+	}
+	return nil
+}
+
+// FinalForSpec 回傳特化對應的終職；沒有時回傳 false。
+func (p *Pack) FinalForSpec(spec string) (Final, bool) {
+	for _, f := range p.Growth.Finals {
+		if f.Spec == spec {
+			return f, true
+		}
+	}
+	return Final{}, false
+}
+
+// FinalByID 找出終職；找不到回傳 false。
+func (p *Pack) FinalByID(id string) (Final, bool) {
+	for _, f := range p.Growth.Finals {
+		if f.ID == id {
+			return f, true
+		}
+	}
+	return Final{}, false
 }

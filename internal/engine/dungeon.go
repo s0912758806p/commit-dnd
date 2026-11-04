@@ -92,9 +92,12 @@ func dungeonTurn(r *Result, e event.Event, c *content.Pack) {
 	if p.HP > 0 {
 		return
 	}
-	lost := d.BagN
+	keep := min(d.BagN, Ability(r.State.Pet, c, "keep_on_down")) // 不落要塞：最舊的幾件留下
+	lost := d.BagN - keep
 	d.Downed, d.Downs = true, d.Downs+1
-	d.Bag, d.BagN = [BagSize]Drop{}, 0
+	var kept [BagSize]Drop
+	copy(kept[:keep], d.Bag[:keep])
+	d.Bag, d.BagN = kept, keep
 	r.dlog(e.At, c, c.Logs.Dungeon.Downed, map[string]string{"lost": strconv.Itoa(lost)})
 	r.Fx = append(r.Fx, EffectDowned)
 }
@@ -141,7 +144,7 @@ func attack(r *Result, e event.Event, c *content.Pack) {
 		return
 	}
 	m, _ := c.MonsterByID(d.Monster.ID)
-	dmg := max(1, pct(PetAtk(r.State, c), elementPct(d.Weapon.Element, m.Element, c)))
+	dmg := max(1, pct(PetAtk(r.State, c), petElementPct(r.State, m, c)))
 	d.Monster.HP -= dmg
 	if d.Monster.HP > 0 {
 		return
@@ -181,7 +184,7 @@ func rescue(r *Result, e event.Event, c *content.Pack) {
 	}
 	d.Downed = false
 	p := &r.State.Pet
-	p.HP = max(1, pct(MaxHP(*p, c), c.Balance.Dungeon.RescueHPPct))
+	p.HP = max(1, pct(MaxHP(*p, c), min(100, c.Balance.Dungeon.RescueHPPct+Ability(*p, c, "rescue_hp_pct"))))
 	r.dlog(e.At, c, c.Logs.Dungeon.Rescue, nil)
 	r.Fx = append(r.Fx, EffectRescue)
 }
@@ -193,6 +196,7 @@ func identifyOne(r *Result, e event.Event, c *content.Pack) {
 		return
 	}
 	it := identify(d.Bag[0], c)
+	it.Power += Ability(r.State.Pet, c, "item_power")
 	copy(d.Bag[:], d.Bag[1:d.BagN])
 	d.BagN--
 	d.Bag[d.BagN] = Drop{}
@@ -250,4 +254,13 @@ func warp(r *Result, e event.Event, c *content.Pack) {
 		d.Floor, d.Cleared, d.Monster = n, c.Balance.Dungeon.EncountersPerFloor, Monster{}
 		r.dlog(e.At, c, c.Logs.Dungeon.Warp, nil)
 	}
+}
+
+// petElementPct 是寵物（武器屬性）打這隻怪物的傷害倍率；相剋時加上 element_pct 終職能力。
+func petElementPct(s State, m content.Monster, c *content.Pack) int {
+	p := elementPct(s.Dungeon.Weapon.Element, m.Element, c)
+	if p > 100 {
+		p += Ability(s.Pet, c, "element_pct")
+	}
+	return p
 }

@@ -99,6 +99,12 @@ func Apply(s State, e event.Event, c *content.Pack) Result {
 		} else {
 			r.log(e.At, c, c.Logs.NoPet, nil)
 		}
+	case "rebirth":
+		if r.State.Pet.Hatched() {
+			rebirth(&r, e, c)
+		} else {
+			r.log(e.At, c, c.Logs.NoPet, nil)
+		}
 	case "party":
 		if r.State.Pet.Hatched() {
 			partyCmd(&r, e, c)
@@ -135,7 +141,7 @@ func advance(s State, at time.Time, c *content.Pack) (_ State, camped bool) {
 
 	b := c.Balance
 	n := periods(&p.SatietyCarry, elapsed, b.Satiety.DecayEveryMinutes)
-	p.Satiety = drain(p.Satiety, n, b.Satiety.DecayAmount)
+	p.Satiety = drain(p.Satiety, n, pct(b.Satiety.DecayAmount, 100-min(90, Ability(*p, c, "satiety_slow"))))
 	n = periods(&p.MoodCarry, elapsed, b.Mood.DecayEveryMinutes)
 	p.Mood = drain(p.Mood, n, b.Mood.DecayAmount)
 	n = periods(&p.HPCarry, elapsed, b.HP.RegenEveryMinutes)
@@ -225,7 +231,8 @@ func commit(r *Result, e event.Event, c *content.Pack) {
 	if day := e.At.Format(time.DateOnly); day != p.SupplyDay {
 		p.SupplyDay, p.SupplyUsed = day, 0
 	}
-	if p.SupplyUsed < b.Supply.CommitsPerDay {
+	xp = pct(xp, 100+KindXPPct(*p, c, kind)+RebirthXPPct(*p, c))
+	if p.SupplyUsed < SupplyPerDay(*p, c) {
 		p.SupplyUsed++
 		xp *= b.Supply.Multiplier
 		r.log(e.At, c, c.Logs.Supply, nil)
@@ -240,7 +247,7 @@ func commit(r *Result, e event.Event, c *content.Pack) {
 	p.Commits++
 	p.Mix.Add(ci.Kind)
 	p.Satiety = min(b.Satiety.Max, p.Satiety+b.Commit.Feed)
-	p.HP = min(MaxHP(*p, c), p.HP+b.Commit.Heal)
+	p.HP = min(MaxHP(*p, c), p.HP+b.Commit.Heal+Ability(*p, c, "commit_heal"))
 	p.XP += xp
 
 	tmpls, ok := c.Logs.Commit[kind]
@@ -288,4 +295,9 @@ func pick(tmpls []string, hash string, seq int64) string {
 		h.Write([]byte(strconv.FormatInt(seq, 10)))
 	}
 	return tmpls[h.Sum32()%uint32(len(tmpls))]
+}
+
+// SupplyPerDay 是每天有補給加倍的 commit 筆數（含 supply_commits 終職能力）。
+func SupplyPerDay(p Pet, c *content.Pack) int {
+	return c.Balance.Supply.CommitsPerDay + Ability(p, c, "supply_commits")
 }

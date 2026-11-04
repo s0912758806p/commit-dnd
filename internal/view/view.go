@@ -32,6 +32,9 @@ func Status(s engine.State, c *content.Pack, now time.Time) string {
 	row("物種", "%s", sp.Name)
 	row("職業", "%s", className(p, c))
 	row("進化", "%s", stageName(p, c))
+	if n := p.Legacy.Rebirths; n > 0 {
+		row("轉生", "%d 次（基礎能力 +%d%%、經驗 +%d%%）", n, engine.RebirthStats(p, c).Atk, engine.RebirthXPPct(p, c))
+	}
 	if cost := c.Cost(p.Level); cost > 0 {
 		row("等級", "Lv %d（XP %d/%d）", p.Level, p.XP, cost)
 	} else {
@@ -94,7 +97,7 @@ func Statusline(s engine.State, c *content.Pack, now time.Time) string {
 }
 
 func supplyLeft(p engine.Pet, c *content.Pack, today string) int {
-	left := c.Balance.Supply.CommitsPerDay
+	left := engine.SupplyPerDay(p, c)
 	if p.SupplyDay == today {
 		left = max(0, left-p.SupplyUsed)
 	}

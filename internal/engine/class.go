@@ -89,9 +89,9 @@ func Judge(m Mix, c *content.Pack) (content.Class, bool) {
 	return c.Growth.Classes[best], true
 }
 
-// Bonus 是寵物目前的百分比加成：職業＋特化＋進化階段。
+// Bonus 是寵物目前的百分比加成：職業＋特化＋進化階段＋轉生累加（迭代 6）。
 func Bonus(p Pet, c *content.Pack) content.Stats {
-	var b content.Stats
+	b := RebirthStats(p, c)
 	if cl, ok := c.ClassByID(p.Class); ok {
 		b = b.Add(cl.Stats)
 	}
@@ -139,6 +139,7 @@ func grow(r *Result, e event.Event, c *content.Pack) {
 		r.clog(e.At, c, g.Logs.Evolve, nil)
 		r.Fx = append(r.Fx, EffectEvolve)
 	}
+	promote(r, e, c)
 }
 
 // classCmd 處理使用者的 class 事件：action=choose（spec=特化 id）或 action=reroll。
@@ -174,6 +175,7 @@ func chooseSpec(r *Result, e event.Event, c *content.Pack) {
 		p.Spec = sp.ID
 		p.HP = min(p.HP, MaxHP(*p, c))
 		r.clog(e.At, c, g.Logs.SpecChosen, map[string]string{"spec": sp.Name})
+		promote(r, e, c) // Lv 30 之後才選特化：這一刻取得終職
 	}
 }
 
@@ -209,7 +211,7 @@ func reroll(r *Result, e event.Event, c *content.Pack) {
 func dropScroll(r *Result, e event.Event, c *content.Pack) {
 	s := c.Growth.Scroll
 	rr := rng{seedFor(r.State, e.Seq, "scroll")}
-	if s.DropPct <= 0 || rr.intn(100) >= s.DropPct {
+	if drop := s.DropPct + Ability(r.State.Pet, c, "scroll_pct"); drop <= 0 || rr.intn(100) >= drop {
 		return
 	}
 	p := &r.State.Pet
