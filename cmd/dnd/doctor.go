@@ -21,8 +21,9 @@ func newDoctorCmd() *cobra.Command {
 		Short: "檢查 dnd 的安裝與資料是否正常",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if settings == "" {
-				settings = claudeSettingsPath()
+			settings, err := install.ClaudeSettingsPath(settings)
+			if err != nil {
+				return err
 			}
 			d := &doctor{cmd: cmd}
 			d.binary()
@@ -145,18 +146,6 @@ func (d *doctor) claude(settings string) {
 			d.ok("statusLine 串接", "會先顯示安裝前原本的 statusLine")
 		}
 	}
-}
-
-// claudeSettingsPath 依 CLAUDE_CONFIG_DIR，否則 ~/.claude，回傳使用者層級的 settings.json。
-func claudeSettingsPath() string {
-	if d := os.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
-		return filepath.Join(d, "settings.json")
-	}
-	h, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Join(".claude", "settings.json")
-	}
-	return filepath.Join(h, ".claude", "settings.json")
 }
 
 func executable(p string) bool {

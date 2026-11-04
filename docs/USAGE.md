@@ -32,6 +32,8 @@ dnd log              # 冒險日誌
 - **心情**：每小時下降，`dnd event user pet` 可以摸摸牠。
 - amend、cherry-pick、rebase 不會重複計分；數值都在 `content/balance.yaml`。
 
+**接上 Claude Code**：執行 `dnd install claude`，確認差異後寫入。Claude Code 會自動重新載入設定，不需要重啟；底部 statusline 會顯示寵物與今日 AI 回合。設定檔位置依序為 `--settings`、`$CLAUDE_CONFIG_DIR/settings.json`、`~/.claude/settings.json`。
+
 ## 指令
 
 | 指令 | 說明 |
@@ -43,6 +45,8 @@ dnd log              # 冒險日誌
 | `dnd doctor [--repo .] [--settings 路徑]` | 檢查資料、寵物、hook 錯誤紀錄、git hook 與 Claude Code 設定；只讀，有問題時 exit 1 |
 | `dnd install git [--repo .]` | 在 repo 的 post-commit 加入 dnd；已有 hook 時只插入標記區塊 |
 | `dnd uninstall git [--repo .]` | 移除 dnd 區塊；檔案只剩 shebang 時整個刪除 |
+| `dnd install claude [--settings 路徑] [--yes]` | 在 Claude Code 的 settings.json 加入 PostToolUse／Stop hook（背景執行）與 statusLine；先印差異、確認、備份成 `settings.json.dnd-backup-時間`，再寫入 |
+| `dnd uninstall claude [--settings 路徑] [--yes]` | 移除 dnd 的 hook 與 statusLine，還原安裝前的 statusLine；同樣先印差異、確認、備份 |
 | `dnd event <source> <type> [key=value...]` | 手動寫入一個事件（開發用）。source：`git`、`claude`、`codex`、`user`、`tick` |
 | `dnd debug rebuild` | 從 events.jsonl 重播並覆寫 state.json；只在 `DND_DEBUG=1` 時出現 |
 
